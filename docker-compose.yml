@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: core_erp_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: core_erp
+      POSTGRES_USER: desarrollo
+      POSTGRES_PASSWORD: 071127
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - core_erp_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U desarrollo -d core_erp"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: core_erp_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - core_erp_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  core_erp_network:
+    driver: bridge
