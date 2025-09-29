@@ -6,6 +6,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/databaseConfig.module';
 import { HttpServerModule } from './http-server/http-server.module';
 import { UsuarioRepositoryAdapter } from './adapter/usuarioRepository.adapter';
+import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter';
+import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContactoEntity } from './database/entities/contacto.entity';
 import { CuentaBancariaEntity } from './database/entities/cuentaBancaria.entity';
@@ -19,11 +21,7 @@ import { RolModuloPermisoEntity } from './database/entities/rolModuloPermiso.ent
 import { SistemaEntity } from './database/entities/sistema.entity';
 import { TipoContactoEntity } from './database/entities/tipoContacto.entity';
 import { UsuarioEntity } from './database/entities/usuario.entity';
-import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter';
-import { TipoContactoRepositoryAdapter } from './adapter/tipoContactoRepository.adapter';
-import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
-import { SistemaRepositoryAdapter } from './adapter/sistemaRepository.adapter';
 
 @Module({
     imports: [
@@ -48,16 +46,12 @@ import { SistemaRepositoryAdapter } from './adapter/sistemaRepository.adapter';
     providers: [
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
-        TipoContactoRepositoryAdapter,
         RolRepositoryAdapter,
-        SistemaRepositoryAdapter
     ],
     exports: [
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
-        TipoContactoRepositoryAdapter,
         RolRepositoryAdapter,
-        SistemaRepositoryAdapter
     ],
 })
 export class InfraestructureModule { }

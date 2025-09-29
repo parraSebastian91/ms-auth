@@ -1,10 +1,10 @@
 import { IRolRepository } from "src/core/domain/puertos/outbound/iRolRepository.interface";
 import { RolEntity } from "../database/entities/rol.entity";
-import { Inject } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
-
+@Injectable()
 export class RolRepositoryAdapter implements IRolRepository {
 
     constructor(@InjectRepository(RolEntity) private rolRepository: Repository<RolEntity>) { }

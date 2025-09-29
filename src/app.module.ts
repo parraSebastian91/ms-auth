@@ -1,6 +1,4 @@
-import { AuthService } from './core/domain/service/auth.service';
-import { AuthAplicationService } from './core/aplication/auth/service/authaplication.service';
-import { AuthController } from './infrastructure/http-server/controllers/auth.controller';
+
 import { Module } from '@nestjs/common';
 import { InfraestructureModule } from './infrastructure/Infraestructure.module';
 import { CoreModule } from './core/core.module';
@@ -8,14 +6,12 @@ import { UsuarioRepositoryAdapter } from './infrastructure/adapter/usuarioReposi
 import { ConfigModule } from '@nestjs/config';
 import configurations from 'config/configurations';
 import databaseConfig from 'config/database.config';
-import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepository.adapter';
-import { TipoContactoRepositoryAdapter } from './infrastructure/adapter/tipoContactoRepository.adapter';
-import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 import { JwtModule } from '@nestjs/jwt';
 
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-ioredis';
-import { SistemaRepositoryAdapter} from './infrastructure/adapter/sistemaRepository.adapter';
+import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepository.adapter';
+import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 
 @Module({
   imports: [
@@ -38,9 +34,7 @@ import { SistemaRepositoryAdapter} from './infrastructure/adapter/sistemaReposit
       adapters: {
         usuarioRepository: UsuarioRepositoryAdapter,
         contactoRepository: ContactoRepositoryAdapter,
-        tipoContactoRepository: TipoContactoRepositoryAdapter,
         rolRepository: RolRepositoryAdapter,
-        sistemaRepository: SistemaRepositoryAdapter
       },
     }),
     JwtModule.register({

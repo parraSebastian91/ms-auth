@@ -3,8 +3,9 @@ import { In, Repository } from "typeorm";
 import { ContactoEntity } from "../database/entities/contacto.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IContactoRepository } from "src/core/domain/puertos/outbound/iContactoRepository.interface";
+import { Injectable } from "@nestjs/common";
 
-
+@Injectable()
 export class ContactoRepositoryAdapter implements IContactoRepository {
 
     constructor(@InjectRepository(ContactoEntity) private contactoRepository: Repository<ContactoEntity>) {
