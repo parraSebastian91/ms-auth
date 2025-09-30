@@ -1,19 +1,16 @@
 services:
-  # Aplicación NestJS
+  # Aplicación NestJS - Producción
   ms-auth:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: ms_auth_app
-    restart: always
+      target: production
+    container_name: ms_auth_app_prod
+    restart: unless-stopped
     ports:
       - "3000:3000"
     env_file:
-      - .env.dev
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - .env.prod
     networks:
       - shared_network
     healthcheck:

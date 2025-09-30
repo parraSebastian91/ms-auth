@@ -6,6 +6,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './controllers/auth.controller';
+import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 
@@ -17,7 +18,8 @@ import { PermissionsGuard } from './guards/permissions.guard';
         }),
     ],
     controllers: [
-        AuthController
+        AuthController,
+        HealthController
     ],
     providers: [
         AuthGuard,
