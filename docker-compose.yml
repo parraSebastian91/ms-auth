@@ -15,7 +15,7 @@ services:
       - .:/app
       - /app/node_modules
     networks:
-      - shared_network
+      - erp_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -24,6 +24,6 @@ services:
       start_period: 40s
 
 networks:
-  shared_network:
+  erp_network:
     external: true
-    name: shared_erp_network
+    name: erp_network

@@ -5,6 +5,8 @@ import { ValidationPipe } from './infrastructure/http-server/pipes/validation.pi
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
+    // Deshabilitar CORS completamente
+  app.enableCors();
   await app.listen(process.env.PORT ?? 3000).then(() => {
     console.log(`Application is running on: ${process.env.PORT ?? 3000}`);
   });
