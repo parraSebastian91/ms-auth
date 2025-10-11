@@ -12,6 +12,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-ioredis';
 import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepository.adapter';
 import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
+import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.ada
         usuarioRepository: UsuarioRepositoryAdapter,
         contactoRepository: ContactoRepositoryAdapter,
         rolRepository: RolRepositoryAdapter,
+        refreshSessionRepository: RefreshSessionRepositoryAdapter
       },
     }),
     JwtModule.register({

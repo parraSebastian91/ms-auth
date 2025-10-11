@@ -7,15 +7,18 @@ import { IAuthAplication } from 'src/core/aplication/auth/authAplication.interfa
 import { AUTH_APLICATION } from 'src/core/core.module';
 import { LoginDto, RefreshDto } from '../model/dto/login.dto';
 import { ApiResponse } from '../model/api-response.model';
-import express, {Request, Response} from 'express';
+import express, { Request, Response } from 'express';
 import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/contacto.filter';
 import { Public } from '../decorators/public.decorator';
 
+const REFRESH_COOKIE = 'refresh_token';
 
 @Controller('auth')
 @UseFilters(CoreExceptionFilter)
 @Public() // Todas las rutas de auth son públicas
 export class AuthController {
+
+
 
     constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
 
@@ -25,11 +28,19 @@ export class AuthController {
         if (!result) {
             return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
         }
+        res.cookie(REFRESH_COOKIE, result.refresh_token, {
+            httpOnly: true,
+            secure: true,              // true en producción (HTTPS)
+            sameSite: 'strict',
+            path: '/auth/refresh',
+            maxAge: Number(process.env.REFRESH_TOKEN_EXPIRATION) || 1000 * 60 * 60 * 24 * 15, // 15 días
+        });
+        delete result.refresh_token; // No enviar el refresh token en el cuerpo de la respuesta
         return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Login exitoso', result));
     }
 
     @Post('refresh')
-    async refresh(@Body() token: RefreshDto, @Res() res: Response){
+    async refresh(@Body() token: RefreshDto, @Res() res: Response) {
         const result = await this.authAplicationService.refreshToken(token.refresh_token, token.userId, token.typeDevice);
         if (!result) {
             return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));

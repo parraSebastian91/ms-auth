@@ -13,6 +13,7 @@ import { AuthAplicationService } from './aplication/auth/service/authaplication.
 import { TokenCacheService } from './domain/service/token-cache.service';
 import { UsuarioService } from './domain/service/Usuario.service';
 import { UsuarioAplicationService } from './aplication/usuario/service/usuarioAplication.service';
+import { IRefreshSessionRepository } from './domain/puertos/outbound/iRefreshSessionRepository.interface';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -20,6 +21,7 @@ export type CoreModuleOptions = {
         usuarioRepository: Type<IUsuarioRepository>;
         contactoRepository: Type<IContactoRepository>;
         rolRepository: Type<IRolRepository>;
+        refreshSessionRepository: Type<IRefreshSessionRepository>;
     }
 }
 
@@ -39,8 +41,7 @@ export class CoreModule {
 
     static register(options: CoreModuleOptions): DynamicModule {
         const { adapters, modules } = options;
-        const { usuarioRepository, contactoRepository, rolRepository } = adapters;
-
+        const { usuarioRepository, contactoRepository, rolRepository, refreshSessionRepository } = adapters;
 
         // Auth Service Provider
 
@@ -54,10 +55,10 @@ export class CoreModule {
 
         const authServiceProvider = {
             provide: AUTH_SERVICE,
-            useFactory(authRepository: IUsuarioRepository, tokenCacheService: TokenCacheService) {
-                return new AuthService(authRepository,  new (require('@nestjs/jwt').JwtService)(), tokenCacheService);
+            useFactory(authRepository: IUsuarioRepository, tokenCacheService: TokenCacheService, refreshSessionRepository: IRefreshSessionRepository) {
+                return new AuthService(authRepository,  new (require('@nestjs/jwt').JwtService)(), tokenCacheService, refreshSessionRepository);
             },
-            inject: [usuarioRepository, TokenCacheService]
+            inject: [usuarioRepository, TokenCacheService, refreshSessionRepository]
         };
 
           const usuarioAplicationProvider = {

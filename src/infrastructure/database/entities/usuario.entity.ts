@@ -1,6 +1,7 @@
-import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToOne, PrimaryColumn, PrimaryGeneratedColumn, Table } from "typeorm"
+import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToMany, OneToOne, PrimaryColumn, PrimaryGeneratedColumn, Table } from "typeorm"
 import { RolEntity } from "./rol.entity";
 import { ContactoEntity } from "./contacto.entity";
+import { RefreshSessionEntity } from "./RefreshSession.entity";
 
 @Entity({ name: 'usuario' })
 export class UsuarioEntity {
@@ -41,5 +42,12 @@ export class UsuarioEntity {
             },
         })
     rol: RolEntity[];
+
+    @OneToMany(() => RefreshSessionEntity, (session) => session.user)
+    refreshSessions: RefreshSessionEntity[];
+
+    constructor(id: number) {
+        Object.assign(this, { id });
+    }
 
 }

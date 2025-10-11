@@ -54,8 +54,9 @@ export class UsuarioModel extends Entity<UsuarioModel> {
             creacion,
             activo,
             update,
+            refreshSessions: [],
             contacto: ContactoModel.toEntity(contacto),
-            rol: rol.map(r => RolModel.toEntity(r))
+            rol: rol.map(r => RolModel.toEntity(r)),
         };;
     }
 

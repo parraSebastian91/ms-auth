@@ -26,4 +26,16 @@ export class TokenCacheService {
         console.log(`[Redis] DEL key: ${key}`);
         await this.cacheManager.del(key);
     }
+
+    // Nuevos métodos JSON genéricos
+    async setJson(key: string, value: any, ttlSeconds: number) {
+        await this.cacheManager.set(key, JSON.stringify(value),ttlSeconds);
+    }
+    async getJson<T = any>(key: string): Promise<T | null> {
+        const v = await this.cacheManager.get<string>(key);
+        return v ? JSON.parse(v) : null;
+    }
+    async deleteKey(key: string) {
+        await this.cacheManager.del(key);
+    }
 }

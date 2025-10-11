@@ -22,6 +22,8 @@ import { SistemaEntity } from './database/entities/sistema.entity';
 import { TipoContactoEntity } from './database/entities/tipoContacto.entity';
 import { UsuarioEntity } from './database/entities/usuario.entity';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
+import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
+import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
 
 @Module({
     imports: [
@@ -41,17 +43,20 @@ import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
             TipoContactoEntity,
             UsuarioEntity,
             FuncionalidadEntity,
+            RefreshSessionEntity
         ]),
     ],
     providers: [
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
+        RefreshSessionRepositoryAdapter
     ],
     exports: [
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
+        RefreshSessionRepositoryAdapter
     ],
 })
 export class InfraestructureModule { }

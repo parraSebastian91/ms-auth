@@ -13,6 +13,7 @@ import { RolEntity } from './entities/rol.entity';
 import { RolModuloPermisoEntity } from './entities/rolModuloPermiso.entity';
 import { CuentaBancariaEntity } from './entities/cuentaBancaria.entity';
 import { FuncionalidadEntity } from './entities/funcionalidad.entity';
+import { RefreshSessionEntity } from './entities/RefreshSession.entity';
 
 @Module({
     imports: [
@@ -39,7 +40,8 @@ import { FuncionalidadEntity } from './entities/funcionalidad.entity';
                     SistemaEntity,
                     TipoContactoEntity,
                     UsuarioEntity,
-                    FuncionalidadEntity
+                    FuncionalidadEntity,
+                    RefreshSessionEntity
                 ],
                 synchronize: false, // Set to false in production
                 logging: process.env.DB_LOGGING === 'true',
