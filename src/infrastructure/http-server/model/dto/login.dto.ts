@@ -1,4 +1,11 @@
-import { IsNotEmpty } from "class-validator";
+import { IsEnum, IsNotEmpty } from "class-validator";
+
+export enum DeviceType {
+  WEB = 'WEB',
+  DESKTOP = 'DESKTOP',
+  MOBILE = 'MOBILE',
+  POSTMAN = 'POSTMAN',
+}
 
 export class LoginDto {
     @IsNotEmpty({ message: "El nombre de usuario es obligatorio" })
@@ -6,7 +13,8 @@ export class LoginDto {
     @IsNotEmpty({ message: "La contraseña es obligatoria" })
     password: string;
     @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
-    typeDevice: string;
+    @IsEnum(DeviceType, { message: "typeDevice debe ser uno de: WEB, DESKTOP, MOBILE, POSTMAN" })
+    typeDevice: DeviceType;
 }
   
 

@@ -13,6 +13,16 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     this.repo = this.dataSource.getRepository(RefreshSessionEntity);
   }
 
+  async findByUserAndDevice(userId: number, deviceType: string): Promise<RefreshSession | null> {
+    return await this.repo.findOne({
+      where: {
+        user: { id: userId },
+        deviceType: deviceType
+      },
+      relations: ['user']
+    });
+  }
+
   private map(e: RefreshSessionEntity): RefreshSession {
     return {
       ...e

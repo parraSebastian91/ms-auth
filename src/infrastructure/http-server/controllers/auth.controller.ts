@@ -18,8 +18,6 @@ const REFRESH_COOKIE = 'refresh_token';
 @Public() // Todas las rutas de auth son públicas
 export class AuthController {
 
-
-
     constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
 
     @Post('login')

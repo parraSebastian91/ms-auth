@@ -15,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { IRefreshSessionRepository } from '../puertos/outbound/iRefreshSessionRepository.interface';
 import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
+import { SessionExistsError } from 'src/core/share/errors/sessionExists.error';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -35,28 +36,30 @@ export class AuthService implements IAuthService {
         const hash = await bcrypt.hash(secret, 10);
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
 
+        const existing = await this.refreshSessionRepo.findByUserAndDevice(user.id.getValue(), deviceType);
+        let plainToken = '';
+        if (existing) {
+            plainToken = await this.rotateSession(existing);
+        } else {
+            const session = await this.refreshSessionRepo.create({
+                user: new UsuarioEntity(user.id.getValue()),
+                deviceType,
+                deviceFingerprint: meta?.fingerprint,
+                refreshTokenHash: hash,
+                ip: meta?.ip,
+                userAgent: meta?.ua,
+                expiresAt
+            });
 
-        // Guardar en BD
-        // implementar create en refreshSessionRepo
-        const session = await this.refreshSessionRepo.create({
-            user: new UsuarioEntity(user.id.getValue()),
-            deviceType,
-            deviceFingerprint: meta?.fingerprint,
-            refreshTokenHash: hash,
-            ip: meta?.ip,
-            userAgent: meta?.ua,
-            expiresAt
-        });
+            plainToken = `${session.id}.${secret}`;
 
-        const plainToken = `${session.id}.${secret}`;
-
-        // Cache ligera (sin secreto)
-        await this.tokenCacheService.setJson(
-            `refresh_session:${session.id}`,
-            { userId: user.id.getValue(), deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
-            Math.floor((expiresAt.getTime() - Date.now()) / 1000)
-        );
-
+            // Cache ligera (sin secreto)
+            await this.tokenCacheService.setJson(
+                `refresh_session:${session.id}`,
+                { userId: user.id.getValue(), deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
+                Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+            );
+        }
         return plainToken;
     }
 
@@ -72,7 +75,7 @@ export class AuthService implements IAuthService {
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
 
         const newSession = await this.refreshSessionRepo.rotate(oldSession, {
-            user: oldSession.userId,
+            user: oldSession.user.id,
             deviceType: oldSession.deviceType,
             deviceFingerprint: oldSession.deviceFingerprint,
             refreshTokenHash: hash,
@@ -91,9 +94,9 @@ export class AuthService implements IAuthService {
         return plainToken;
     }
 
-/** Actualizarpara flujo nuevo
- * validar token en cache, si no existe validar en db. no en ambos de igual manera. 
- */
+    /** Actualizarpara flujo nuevo
+     * validar token en cache, si no existe validar en db. no en ambos de igual manera. 
+     */
     async refreshToken(token: string, userId: string, typeDevice: string): Promise<{ access_token: string, refresh_token: string } | null> {
         try {
             // Nuevo flujo híbrido
