@@ -19,7 +19,7 @@ import { SessionExistsError } from 'src/core/share/errors/sessionExists.error';
 
 @Injectable()
 export class AuthService implements IAuthService {
-
+    private codes = new Map<string, any>();
     constructor(
         private usuarioRepository: IUsuarioRepository,
         private jwtService: JwtService,
@@ -51,11 +51,11 @@ export class AuthService implements IAuthService {
                 expiresAt
             });
 
-            plainToken = `${session.id}.${secret}`;
+            plainToken = `${session.sessionUuid}.${secret}`;
 
             // Cache ligera (sin secreto)
             await this.tokenCacheService.setJson(
-                `refresh_session:${session.id}`,
+                `refresh_session:${session.sessionUuid}`,
                 { userId: user.id.getValue(), deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
                 Math.floor((expiresAt.getTime() - Date.now()) / 1000)
             );
@@ -184,7 +184,7 @@ export class AuthService implements IAuthService {
     }
 
 
-    async login(username: string, password: string, typeDevice: string): Promise<{ access_token: string, refresh_token: string } | null> {
+    async authetication(username: string, password: string, typeDevice: string, code_challenge: string): Promise<string[] | null> {
         const usuarioDB = await this.usuarioRepository.getUsuarioByUsername(username);
         if (!usuarioDB) {
             throw new UserNotFoundError("Usuario no encontrado");
@@ -193,18 +193,60 @@ export class AuthService implements IAuthService {
         if (!await bcrypt.compare(password, usuario.password)) {
             throw new LoginError("Usuario no encontrado o contraseña incorrecta");
         }
-        delete usuario.password;
-        const payload = {
+
+        const code = await this.createAuthorizationCode(
+            usuario,
+            code_challenge,
+            typeDevice
+        );
+        const uris = await this.usuarioRepository
+            .getSystemsByUsername(username)
+            .then(data => {
+                return data.map(item => `${item.path}?code=${encodeURIComponent(code)}`); // Ajusta según la estructura real de 'item'
+            });
+
+        return uris;
+    }
+
+    async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string): Promise<string> {
+        const code = randomBytes(32).toString('hex');
+        this.codes.set(code, {
             id: usuario.id.getValue(),
             sub: usuario.userName,
             rol: usuario.rol.map(r => r.codigo),
-            permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : [])
+            permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []),
+            typeDevice,
+            codeChallenge,
+            createdAt: Date.now()
+        });
+        return code;
+    }
+
+    private base64url(buffer: Buffer) {
+        return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    private sha256base64url(input: string) {
+        const digest = bcrypt.createHash('sha256').update(input).digest();
+        return this.base64url(digest);
+    }
+
+    async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
+        const stored = this.codes.get(code);
+        if (!stored) return null;
+
+        // generar JWT
+        const payload = {
+            id: stored.id.getValue(),
+            sub: stored.userName,
+            rol: stored.rol.map(r => r.codigo),
+            permisos: stored.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : [])
         };
-        const access_token = this.jwtService.sign(payload, { expiresIn: process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET });
-
-        // Nuevo: siempre formato <id>.<secret>
-        const refresh_token = await this.createRefreshSession(usuario, typeDevice);
-
-        return { access_token, refresh_token };
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+        const refreshToken = await this.createRefreshSession(stored, typeDevice);
+        // opcional: refresh token, persistencia, revocación
+        // invalidar code (one-time)
+        this.codes.delete(code);
+        return { access_token: accessToken, refresh_token: refreshToken };
     }
 }

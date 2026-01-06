@@ -8,7 +8,7 @@ import { Injectable } from "@nestjs/common";
 export class UsuarioRepositoryAdapter implements IUsuarioRepository {
     constructor(
         @InjectRepository(UsuarioEntity) private readonly usuarioRepository: Repository<UsuarioEntity>,
-    ) {}
+    ) { }
 
     getValidId(): Promise<number> {
         return this.usuarioRepository.count().then(count => count + 1);
@@ -42,6 +42,29 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         return usuario;
     }
 
+    async getSystemsByUsername(username: string) {
+        const usuario = await this.usuarioRepository
+            .createQueryBuilder('usuario')
+            .leftJoinAndSelect('usuario.rol', 'rol')
+            .leftJoinAndSelect('rol.modulos', 'modulos')
+            .leftJoinAndSelect('modulos.sistema', 'sistema')
+            .where('usuario.userName = :username', { username })
+            .andWhere('usuario.activo = :usuarioActivo', { usuarioActivo: true })
+            .andWhere('sistema.activo = :sistemaActivo', { sistemaActivo: true })
+            .getOne();
+
+        // Deduplicar sistemas en memoria
+        if (!usuario) return [];
+        const sistemasUnicos = Array.from(
+            new Map(
+                usuario.rol
+                    .flatMap(r => r.modulos.map(m => m.sistema))
+                    .map(s => [s.id, s])
+            ).values()
+        );
+        return sistemasUnicos;
+    }
+
     createUsuario(data: UsuarioEntity): Promise<UsuarioEntity> {
         const newUsuario = this.usuarioRepository.create(data);
         return this.usuarioRepository.save(newUsuario);
@@ -50,7 +73,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         return this.usuarioRepository.save({ ...data, id });
     }
     deleteUsuario(id: number): Promise<void> {
-        return this.usuarioRepository.delete(id).then(() => {});
+        return this.usuarioRepository.delete(id).then(() => { });
     }
-      
+
 }

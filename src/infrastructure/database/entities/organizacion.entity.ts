@@ -10,6 +10,9 @@ export class OrganizacionEntity {
     @PrimaryGeneratedColumn({ type: "bigint", name: 'organizacion_id' })
     id: number;
 
+    @Column({ type: "uuid", name: 'organizacion_uuid' })
+    organizacion_uuid: string;
+
     @Column({ type: "character varying", name: 'razon_social' })
     razonSocial: string;
 
@@ -24,6 +27,9 @@ export class OrganizacionEntity {
 
     @Column({ type: "text", name: 'logo_base64', nullable: true })
     logoBase64?: string;
+
+    @Column({ type: "boolean", name: 'activo', default: true })
+    activo: boolean;
 
     @Column({ type: "bigint", name: 'contacto_id' })
     contactoId: number;

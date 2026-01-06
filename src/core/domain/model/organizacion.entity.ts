@@ -7,11 +7,13 @@ import { CuentaBancariaModel } from "./cuentaBancaria.model";
 
 export class OrganizacionModel extends Entity<OrganizacionModel> {
 
+    uuid: string;
     razonSocial: string;
     rut: string;
     dv: string;
     giro: string;
     logoBase64?: string;
+    activo: boolean;
     contacto: ContactoModel[];
     sistemas: SistemaModel[]; // Define the type for sistemas if available
     cuentasBancarias: CuentaBancariaModel[]; // Define the type for cuentasBancarias if
@@ -41,15 +43,17 @@ export class OrganizacionModel extends Entity<OrganizacionModel> {
     }
 
     static toEntity(organizacionModel: OrganizacionModel): OrganizacionEntity {
-        const { id, razonSocial, rut, dv, giro, logoBase64, contacto, sistemas,cuentasBancarias } = organizacionModel;
+        const { id, uuid, razonSocial, rut, dv, giro, logoBase64, contacto, sistemas,cuentasBancarias, activo } = organizacionModel;
 
         const organizacionEntity: OrganizacionEntity = {
             id: Number(id.getValue()),
+            organizacion_uuid: uuid,
             razonSocial,
             rut,
             dv,
             giro,
             logoBase64,
+            activo,
             contactos: contacto.map(c => ContactoModel.toEntity(c)),
             contactoId: null, // Asignar valor adecuado si está disponible
             sistemas: sistemas ? sistemas.map(s => SistemaModel.toEntity(s)) : [],

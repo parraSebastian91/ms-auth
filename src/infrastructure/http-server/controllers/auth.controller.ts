@@ -2,7 +2,7 @@
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session } from '@nestjs/common';
 import { IAuthAplication } from 'src/core/aplication/auth/authAplication.interface';
 import { AUTH_APLICATION } from 'src/core/core.module';
 import { LoginDto, RefreshDto } from '../model/dto/login.dto';
@@ -20,20 +20,23 @@ export class AuthController {
 
     constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
 
-    @Post('login')
+    @Post('callback')
+    async callback(@Body() code: any, @Session() session: Record<string, any>) {
+      const tokens = await this.authAplicationService.exchangeCodeForToken(code.code,code.typeDevice);
+
+      // El token se queda en el servidor, NO se envía al cliente
+      session.accessToken = tokens.access_token;
+      session.refreshToken = tokens.refresh_token;
+
+      return { message: 'Autenticación exitosa' };
+    }
+
+    @Post('authenticate')
     async login(@Body() loginDto: LoginDto, @Res() res: Response) {
-        const result = await this.authAplicationService.login(loginDto);
+        const result = await this.authAplicationService.authetication(loginDto);
         if (!result) {
             return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
         }
-        res.cookie(REFRESH_COOKIE, result.refresh_token, {
-            httpOnly: true,
-            secure: true,              // true en producción (HTTPS)
-            sameSite: 'strict',
-            path: '/auth/refresh',
-            maxAge: Number(process.env.REFRESH_TOKEN_EXPIRATION) || 1000 * 60 * 60 * 24 * 15, // 15 días
-        });
-        delete result.refresh_token; // No enviar el refresh token en el cuerpo de la respuesta
         return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Login exitoso', result));
     }
 
@@ -55,4 +58,27 @@ export class AuthController {
             return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Token Válido', result));
         }
     }
+
+      // POST /oauth/token
+  @Get('token')
+  async token(@Body() body: any, @Res() res: Response, @Session() session: Record<string, any>) {
+    // form encoded body expected
+    const {code, typeDevice} = body;
+
+    const tokenResult = await this.authAplicationService.exchangeCodeForToken(
+      code,
+      typeDevice
+    );
+
+    if (!tokenResult) {
+      return res.status(400).json({ error: 'invalid_grant' });  
+    }
+
+    session.accessToken = tokenResult.access_token;
+    session.refreshToken = tokenResult.refresh_token;
+
+    return res.json({
+      msj: 'Autenticación exitosa'
+    });
+  }
 }

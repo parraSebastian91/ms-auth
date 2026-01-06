@@ -12,6 +12,8 @@ export class LoginDto {
     username: string;
     @IsNotEmpty({ message: "La contraseña es obligatoria" })
     password: string;
+    @IsNotEmpty({ message: "El código de desafío es obligatorio" })
+    code_challenge: string;
     @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
     @IsEnum(DeviceType, { message: "typeDevice debe ser uno de: WEB, DESKTOP, MOBILE, POSTMAN" })
     typeDevice: DeviceType;

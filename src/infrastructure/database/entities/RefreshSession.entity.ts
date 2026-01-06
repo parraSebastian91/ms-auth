@@ -7,6 +7,9 @@ export class RefreshSessionEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
+  @Column({ name: 'session_uuid', length: 36 })
+  sessionUuid: string;
+
   //   @Index()
   //   @Column({ name: 'user_id', type: 'bigint' })
   //   userId: number;

@@ -8,4 +8,5 @@ export interface IUsuarioRepository {
     createUsuario(data: UsuarioEntity): Promise<UsuarioEntity>;
     updateUsuario(id: number, data: UsuarioEntity): Promise<UsuarioEntity>;
     deleteUsuario(id: number): Promise<void>;
+    getSystemsByUsername(username: string): Promise<any[]>;
 }

@@ -2,6 +2,7 @@ import { UsuarioEntity } from "src/infrastructure/database/entities/usuario.enti
 
 export class RefreshSession {
   id?: number;
+  sessionUuid?: string;
   user: UsuarioEntity;
   deviceType: string;
   deviceFingerprint?: string;
