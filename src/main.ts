@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from './infrastructure/http-server/pipes/validation.pipe';
-import * as Session from 'express-session';
+const session = require('express-session');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,7 +10,7 @@ async function bootstrap() {
   app.enableCors();
 
   app.use(
-    Session({
+    session({
       secret: process.env.SECRET_SESSION || 'default_secret',
       resave: false,
       saveUninitialized: false,
