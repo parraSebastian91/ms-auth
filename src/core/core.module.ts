@@ -14,6 +14,10 @@ import { TokenCacheService } from './domain/service/token-cache.service';
 import { UsuarioService } from './domain/service/Usuario.service';
 import { UsuarioAplicationService } from './aplication/usuario/service/usuarioAplication.service';
 import { IRefreshSessionRepository } from './domain/puertos/outbound/iRefreshSessionRepository.interface';
+import { BffService } from './domain/service/bff.service';
+import { HttpService } from '@nestjs/axios';
+import { IBffService } from './domain/puertos/inbound/IBffService.interface';
+import { BffAplicationService } from './aplication/bff/service/BffAplication.service';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -28,12 +32,14 @@ export type CoreModuleOptions = {
 // Application service reference
 export const USUARIO_APPLICATION = 'USUARIO_APPLICATION';
 export const AUTH_APLICATION = 'AUTH_APLICATION'
-
+export const BFF_APPLICATION = 'BFF_APPLICATION';
 
 // Domain services references
 
 export const USUARIO_SERVICE = 'USUARIO_SERVICE';
 export const AUTH_SERVICE = 'AUTH_SERVICE'
+export const BFF_SERVICE = 'BFF_SERVICE';
+
 
 
 @Module({})
@@ -56,12 +62,14 @@ export class CoreModule {
         const authServiceProvider = {
             provide: AUTH_SERVICE,
             useFactory(authRepository: IUsuarioRepository, tokenCacheService: TokenCacheService, refreshSessionRepository: IRefreshSessionRepository) {
-                return new AuthService(authRepository,  new (require('@nestjs/jwt').JwtService)(), tokenCacheService, refreshSessionRepository);
+                return new AuthService(authRepository, new (require('@nestjs/jwt').JwtService)(), tokenCacheService, refreshSessionRepository);
             },
             inject: [usuarioRepository, TokenCacheService, refreshSessionRepository]
         };
 
-          const usuarioAplicationProvider = {
+        // Usuario Service Provider
+
+        const usuarioAplicationProvider = {
             provide: USUARIO_APPLICATION,
             useFactory(usuarioService: IUsuarioService) {
                 return new UsuarioAplicationService(usuarioService);
@@ -69,7 +77,6 @@ export class CoreModule {
             inject: [USUARIO_SERVICE]
         };
 
-        // Usuario Service Provider
         const usuarioServiceProvider = {
             provide: USUARIO_SERVICE,
             useFactory(
@@ -90,6 +97,24 @@ export class CoreModule {
             ]
         };
 
+        // BFF Service Provider
+
+        const bffAplicationProvider = {
+            provide: BFF_APPLICATION,
+            useFactory(bffService: IBffService) {
+                return new BffAplicationService(bffService);
+            },
+            inject: [BFF_SERVICE]
+        }
+
+
+        const bffServiceProvider = {
+            provide: BFF_SERVICE,
+            useFactory() {
+                return new BffService(new HttpService());
+            }
+        };
+
         return {
             module: CoreModule,
             global: true,
@@ -102,11 +127,14 @@ export class CoreModule {
                 usuarioServiceProvider,
                 authAplicationProvider,
                 authServiceProvider,
+                bffAplicationProvider,
+                bffServiceProvider,
             ],
             exports: [
                 USUARIO_APPLICATION,
                 AUTH_APLICATION,
-                AUTH_SERVICE
+                AUTH_SERVICE,
+                BFF_APPLICATION,
             ],
         };
     }

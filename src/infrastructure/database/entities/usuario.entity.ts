@@ -9,6 +9,9 @@ export class UsuarioEntity {
     @PrimaryGeneratedColumn({ type: "bigint", name: 'usuario_id' })
     id: number;
 
+    @Column({ type: "uuid", name: 'usuario_uuid' })
+    usuarioUuid: string;
+
     @Column({ type: "character varying", name: 'username' })
     userName: string;
 
@@ -46,8 +49,8 @@ export class UsuarioEntity {
     @OneToMany(() => RefreshSessionEntity, (session) => session.user)
     refreshSessions: RefreshSessionEntity[];
 
-    constructor(id: number) {
-        Object.assign(this, { id });
+    constructor(usuarioUuid: string) {
+        Object.assign(this, { usuarioUuid });
     }
 
 }

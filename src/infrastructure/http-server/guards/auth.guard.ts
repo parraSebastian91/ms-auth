@@ -12,7 +12,7 @@ export class AuthGuard implements CanActivate {
     @Inject(AUTH_SERVICE) private authService: IAuthService,
     private jwtService: JwtService,
     private reflector: Reflector,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Verificar si la ruta está marcada como pública
@@ -20,42 +20,43 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    
+
     if (isPublic) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
-    
-    if (!token) {
-      throw new UnauthorizedException('Token de acceso requerido');
+    const session = this.extractSession(request);
+
+    if (!session) {
+      throw new UnauthorizedException('No hay sesión activa. Por favor inicia sesión.');
     }
 
     try {
       // Validar el token usando el servicio de autenticación
-      const userId = await this.authService.validateToken(token);
-      
+      const userId = await this.authService.validateToken(session.accessToken);
+
       if (!userId) {
         throw new UnauthorizedException('Token inválido o expirado');
       }
 
       // Verificar la estructura del token JWT para obtener información adicional
-      const payload = this.jwtService.decode(token) as any;
-      
+      const payload = this.jwtService.decode(session.accessToken) as any;
+
       if (!payload) {
         throw new UnauthorizedException('Token malformado');
       }
 
       // Agregar información del usuario al request para uso posterior
       request['user'] = {
-        userId: payload.id || payload.userId || userId,
+        userId: payload.id || payload.userId || payload.userUuid,
         username: payload.username || payload.sub,
         roles: payload.rol || payload.roles || [],
         permissions: payload.permisos || payload.permissions || [],
-        token: token // Incluir el token original para uso en otros guards
+        accessToken: session.accessToken,
+        typeDevice: session.typeDevice
       };
-      
+
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -65,8 +66,7 @@ export class AuthGuard implements CanActivate {
     }
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+  private extractSession(request: Request): any {
+    return (request as any).session;
   }
 }

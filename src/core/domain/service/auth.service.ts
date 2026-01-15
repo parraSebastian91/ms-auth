@@ -15,7 +15,18 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { IRefreshSessionRepository } from '../puertos/outbound/iRefreshSessionRepository.interface';
 import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
-import { SessionExistsError } from 'src/core/share/errors/sessionExists.error';
+import { Id } from 'src/core/share/valueObject/id.valueObject';
+import { RefreshSession } from '../model/RefreshSession.model';
+
+interface AuthCodeStored {
+    userUuid: string;
+    sub: string;
+    rol: string[];
+    permisos: string[];
+    typeDevice: string;
+    codeChallenge: string;
+    createdAt: number;
+}
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -31,18 +42,18 @@ export class AuthService implements IAuthService {
         return Number(process.env.JWT_REFRESH_DAYS ?? 7);
     }
     /** validar que el usuario no tenga mas de 1 session por dispositivo y validar en cache antes que en db */
-    private async createRefreshSession(user: UsuarioModel, deviceType: string, meta?: { ip?: string, ua?: string, fingerprint?: string }) {
+    private async createRefreshSession(user: AuthCodeStored, deviceType: string, meta?: { ip?: string, ua?: string, fingerprint?: string }) {
         const secret = randomBytes(48).toString('hex');
         const hash = await bcrypt.hash(secret, 10);
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
 
-        const existing = await this.refreshSessionRepo.findByUserAndDevice(user.id.getValue(), deviceType);
+        const existing = await this.refreshSessionRepo.findByUserAndDevice(user.userUuid, deviceType);
         let plainToken = '';
         if (existing) {
             plainToken = await this.rotateSession(existing);
         } else {
             const session = await this.refreshSessionRepo.create({
-                user: new UsuarioEntity(user.id.getValue()),
+                user: new UsuarioEntity(user.userUuid),
                 deviceType,
                 deviceFingerprint: meta?.fingerprint,
                 refreshTokenHash: hash,
@@ -56,18 +67,18 @@ export class AuthService implements IAuthService {
             // Cache ligera (sin secreto)
             await this.tokenCacheService.setJson(
                 `refresh_session:${session.sessionUuid}`,
-                { userId: user.id.getValue(), deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
+                { userId: user.userUuid, deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
                 Math.floor((expiresAt.getTime() - Date.now()) / 1000)
             );
         }
         return plainToken;
     }
 
-    private async rotateSession(oldSession: any) {
+    private async rotateSession(oldSession: RefreshSession) {
         // Revocar anterior
         // implementar revokeById en refreshSessionRepo
-        await this.refreshSessionRepo.revokeById(oldSession.id);
-        await this.tokenCacheService.deleteKey(`refresh_session:${oldSession.id}`);
+        await this.refreshSessionRepo.revokeById(oldSession.sessionUuid);
+        await this.tokenCacheService.deleteKey(`refresh_session:${oldSession.sessionUuid}`);
 
         // Crear nueva sesión encadenada (rotationParentId)
         const secret = randomBytes(48).toString('hex');
@@ -75,7 +86,7 @@ export class AuthService implements IAuthService {
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
 
         const newSession = await this.refreshSessionRepo.rotate(oldSession, {
-            user: oldSession.user.id,
+            user: oldSession.user,
             deviceType: oldSession.deviceType,
             deviceFingerprint: oldSession.deviceFingerprint,
             refreshTokenHash: hash,
@@ -102,11 +113,11 @@ export class AuthService implements IAuthService {
             // Nuevo flujo híbrido
             if (token.includes('.')) {
                 const [sessionIdStr, secret] = token.split('.');
-                const sessionId = Number(sessionIdStr);
-                if (!sessionId || !secret) return null;
+                const sessionUuid = sessionIdStr;
+                if (!sessionUuid || !secret) return null;
 
                 // Cache lookup
-                const cacheKey = `refresh_session:${sessionId}`;
+                const cacheKey = `refresh_session:${sessionUuid}`;
                 const cached = await this.tokenCacheService.getJson(cacheKey);
                 let session = null;
 
@@ -116,7 +127,7 @@ export class AuthService implements IAuthService {
                 }
 
                 // Fetch DB (si no hay cache o para verificar hash)
-                session = await this.refreshSessionRepo.findById(sessionId);
+                session = await this.refreshSessionRepo.findById(sessionUuid);
                 if (!session) return null;
                 if (session.revokedAt) return null;
                 if (session.userId !== Number(userId) || session.deviceType !== typeDevice) return null;
@@ -153,18 +164,18 @@ export class AuthService implements IAuthService {
             if (!usuarioDB) return null;
             const usuario = UsuarioModel.create(usuarioDB);
             const payload = {
-                id: usuario.id.getValue(),
+                userUuid: usuario.uuid,
                 sub: usuario.userName,
                 rol: usuario.rol.map(r => r.nombre),
-                permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : [])
-            };
+                permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : []),
+            } as AuthCodeStored;
             const access_token = this.jwtService.sign(payload, {
                 expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
                 secret: process.env.JWT_SECRET
             });
 
             // Migración: crear sesión nueva y no volver a emitir formato viejo
-            const newRefresh = await this.createRefreshSession(usuario, typeDevice);
+            const newRefresh = await this.createRefreshSession(payload, typeDevice);
             // Revoca cache legacy
             await this.tokenCacheService.deleteRefreshToken(userId, typeDevice);
 
@@ -184,7 +195,7 @@ export class AuthService implements IAuthService {
     }
 
 
-    async authetication(username: string, password: string, typeDevice: string, code_challenge: string): Promise<string[] | null> {
+    async authetication(username: string, password: string, typeDevice: string, code_challenge: string): Promise<{ code: string, url: string }[] | null> {
         const usuarioDB = await this.usuarioRepository.getUsuarioByUsername(username);
         if (!usuarioDB) {
             throw new UserNotFoundError("Usuario no encontrado");
@@ -202,23 +213,30 @@ export class AuthService implements IAuthService {
         const uris = await this.usuarioRepository
             .getSystemsByUsername(username)
             .then(data => {
-                return data.map(item => `${item.path}?code=${encodeURIComponent(code)}`); // Ajusta según la estructura real de 'item'
+                return data.map(item => {
+                    return {
+                        code: encodeURIComponent(code),
+                        url: `${item.path}/validate?code=${encodeURIComponent(code)}`
+                    }
+                }); // Ajusta según la estructura real de 'item'
             });
 
         return uris;
     }
 
+
+
     async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
         this.codes.set(code, {
-            id: usuario.id.getValue(),
+            userUuid: usuario.uuid,
             sub: usuario.userName,
-            rol: usuario.rol.map(r => r.codigo),
-            permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []),
+            rol: usuario.rol.map(r => r.codigo) as string[],
+            permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []) as string[],
             typeDevice,
             codeChallenge,
             createdAt: Date.now()
-        });
+        } as AuthCodeStored);
         return code;
     }
 
@@ -232,17 +250,18 @@ export class AuthService implements IAuthService {
     }
 
     async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
-        const stored = this.codes.get(code);
+        const stored = this.codes.get(code) as AuthCodeStored;
         if (!stored) return null;
+
 
         // generar JWT
         const payload = {
-            id: stored.id.getValue(),
-            sub: stored.userName,
-            rol: stored.rol.map(r => r.codigo),
-            permisos: stored.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : [])
+            userUuid: stored.userUuid,
+            sub: stored.sub,
+            rol: stored.rol,
+            permisos: stored.permisos
         };
-        const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '1h', secret: process.env.JWT_SECRET });
         const refreshToken = await this.createRefreshSession(stored, typeDevice);
         // opcional: refresh token, persistencia, revocación
         // invalidar code (one-time)

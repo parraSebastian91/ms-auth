@@ -13,10 +13,10 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     this.repo = this.dataSource.getRepository(RefreshSessionEntity);
   }
 
-  async findByUserAndDevice(userId: number, deviceType: string): Promise<RefreshSession | null> {
+  async findByUserAndDevice(userUuid: string, deviceType: string): Promise<RefreshSession | null> {
     return await this.repo.findOne({
       where: {
-        user: { id: userId },
+        user: { usuarioUuid: userUuid },
         deviceType: deviceType
       },
       relations: ['user']
@@ -35,18 +35,18 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     return this.map(saved);
   }
 
-  async findById(id: number): Promise<RefreshSession | null> {
-    const found = await this.repo.findOne({ where: { id } });
+  async findById(sessionUuid: string): Promise<RefreshSession | null> {
+    const found = await this.repo.findOne({ where: { sessionUuid } });
     return found ? this.map(found) : null;
   }
 
-  async revokeById(id: number): Promise<void> {
-    await this.repo.update({ id }, { revokedAt: new Date() });
+  async revokeById(sessionUuid: string): Promise<void> {
+    await this.repo.update({ sessionUuid }, { revokedAt: new Date() });
   }
 
   async rotate(oldSession: RefreshSession, newSession: RefreshSession): Promise<RefreshSession> {
     return await this.dataSource.transaction(async manager => {
-      await manager.update(RefreshSessionEntity, { id: oldSession.id }, { revokedAt: new Date(), lastUsedAt: new Date() });
+      await manager.update(RefreshSessionEntity, { sessionUuid: oldSession.sessionUuid }, { revokedAt: new Date(), lastUsedAt: new Date() });
       const entity = manager.create(RefreshSessionEntity, newSession);
       const saved = await manager.save(entity);
       return this.map(saved);

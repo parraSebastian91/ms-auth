@@ -1,3 +1,5 @@
+import { BffService } from './core/domain/service/bff.service';
+import { BffAplicationService } from './core/aplication/bff/service/BffAplication.service';
 
 import { Module } from '@nestjs/common';
 import { InfraestructureModule } from './infrastructure/Infraestructure.module';
@@ -13,6 +15,8 @@ import * as redisStore from 'cache-manager-ioredis';
 import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepository.adapter';
 import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -43,6 +47,11 @@ import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/Refres
       secret: process.env.JWT_SECRET || 'TU_SECRETO_AQUI',
       signOptions: { expiresIn: '1h' },
     }),
-  ]
+    HttpModule.register({
+      timeout: 5000,
+      maxRedirects: 5,
+    }),
+  ],
+  providers: [],
 })
 export class AppModule { }

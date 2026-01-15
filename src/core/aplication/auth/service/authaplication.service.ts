@@ -19,7 +19,7 @@ export class AuthAplicationService implements IAuthAplication {
         return this.authService.validateToken(token);
     }
 
-    async authetication(loginDto: { username: string, password: string, typeDevice: string, code_challenge: string }): Promise<string[] | null> {
+    async authetication(loginDto: { username: string, password: string, typeDevice: string, code_challenge: string }): Promise<{ code: string, url: string }[] | null> {
         return this.authService.authetication(loginDto.username, loginDto.password, loginDto.typeDevice, loginDto.code_challenge);
     }
 

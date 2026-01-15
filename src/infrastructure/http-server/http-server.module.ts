@@ -9,6 +9,7 @@ import { AuthController } from './controllers/auth.controller';
 import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { BffProxyController } from './controllers/bffproxy.controller';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
     ],
     controllers: [
         AuthController,
+        BffProxyController,
         HealthController
     ],
     providers: [

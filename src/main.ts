@@ -22,6 +22,15 @@ async function bootstrap() {
       },
     })
   )
+  app.getHttpAdapter().getInstance().set('trust proxy', true); // o true si está detrás de un proxy
+
+  app.use((req, res, next) => {
+    console.log('path:', req.path);
+    console.log('X-Real-IP:', req.headers['x-real-ip']);
+    console.log('X-Forwarded-For:', req.headers['x-forwarded-for']);
+    console.log('IP remota:', req.ip);
+    next();
+  });
 
   await app.listen(process.env.PORT ?? 3000).then(() => {
     console.log(`Application is running on: ${process.env.PORT ?? 3000}`);
