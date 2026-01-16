@@ -111,7 +111,7 @@ export class CoreModule {
         const bffServiceProvider = {
             provide: BFF_SERVICE,
             useFactory() {
-                return new BffService(new HttpService());
+                return new BffService(new (require('@nestjs/axios').HttpService)());
             }
         };
 

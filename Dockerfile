@@ -8,10 +8,12 @@ RUN npm ci
 # Etapa de desarrollo (con hot-reload)
 FROM node:20-alpine AS development
 WORKDIR /app
+COPY package*.json ./
 # COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 RUN npm install
+COPY . .
 ENV NODE_ENV=development
+RUN npm run build
 EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
 

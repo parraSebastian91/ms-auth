@@ -20,12 +20,12 @@ import { RefreshSessionEntity } from './entities/RefreshSession.entity';
         TypeOrmModule.forRootAsync({
             useFactory: () => ({
                 type: 'postgres',
-                host: process.env.DB_HOST || 'localhost',
-                port: parseInt(process.env.DB_PORT, 10) || 5432,
-                username: process.env.DB_USERNAME || 'desarrollo',
-                password: process.env.DB_PASSWORD || '071127',
-                database: process.env.DB_NAME || 'core_erp',
-                schema: process.env.DB_SCHEMA || 'core',
+                host: process.env.DATABASE_HOST || 'localhost',
+                port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
+                username: process.env.DATABASE_USER || 'desarrollo',
+                password: process.env.DATABASE_PASSWORD || 'desarrollo123',
+                database: process.env.DATABASE_NAME || 'core_erp',
+                schema: process.env.DATABASE_SCHEMA || 'core',
                 entities: [
                     ContactoEntity,
                     CuentaBancariaEntity,

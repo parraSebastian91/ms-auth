@@ -4,7 +4,7 @@ https://docs.nestjs.com/modules
 
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { AuthController } from './controllers/auth.controller';
 import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
@@ -15,7 +15,7 @@ import { BffProxyController } from './controllers/bffproxy.controller';
     imports: [
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'TU_SECRETO_AQUI',
-            signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+            signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '1h' } as JwtSignOptions,
         }),
     ],
     controllers: [

@@ -11,7 +11,7 @@ import { IUsuarioRepository } from '../puertos/outbound/iUsuarioRepository.inter
 import * as bcrypt from 'bcrypt';
 import { UserNotFoundError } from 'src/core/share/errors/UserNotFound.error';
 import { LoginError } from 'src/core/share/errors/LoginError.error';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { IRefreshSessionRepository } from '../puertos/outbound/iRefreshSessionRepository.interface';
 import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
@@ -149,7 +149,7 @@ export class AuthService implements IAuthService {
                 const access_token = this.jwtService.sign(payload, {
                     expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
                     secret: process.env.JWT_SECRET
-                });
+                } as JwtSignOptions);
 
                 // Rotación
                 const newRefresh = await this.rotateSession(session);
@@ -172,7 +172,7 @@ export class AuthService implements IAuthService {
             const access_token = this.jwtService.sign(payload, {
                 expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
                 secret: process.env.JWT_SECRET
-            });
+            }as JwtSignOptions);
 
             // Migración: crear sesión nueva y no volver a emitir formato viejo
             const newRefresh = await this.createRefreshSession(payload, typeDevice);

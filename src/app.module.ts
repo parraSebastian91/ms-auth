@@ -15,7 +15,6 @@ import * as redisStore from 'cache-manager-ioredis';
 import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepository.adapter';
 import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
-import { APP_INTERCEPTOR } from '@nestjs/core';
 import { HttpModule } from '@nestjs/axios';
 
 @Module({
