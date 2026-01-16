@@ -49,8 +49,7 @@ export class UsuarioEntity {
     @OneToMany(() => RefreshSessionEntity, (session) => session.user)
     refreshSessions: RefreshSessionEntity[];
 
-    constructor(usuarioUuid: string) {
-        Object.assign(this, { usuarioUuid });
+    constructor() {
     }
 
 }

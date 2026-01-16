@@ -19,6 +19,7 @@ import { Id } from 'src/core/share/valueObject/id.valueObject';
 import { RefreshSession } from '../model/RefreshSession.model';
 
 interface AuthCodeStored {
+    userId: Id;
     userUuid: string;
     sub: string;
     rol: string[];
@@ -52,8 +53,12 @@ export class AuthService implements IAuthService {
         if (existing) {
             plainToken = await this.rotateSession(existing);
         } else {
+            const usuario = new UsuarioEntity();
+            usuario.usuarioUuid = user.userUuid;
+            usuario.id = Number(user.userId.getValue());
+
             const session = await this.refreshSessionRepo.create({
-                user: new UsuarioEntity(user.userUuid),
+                user: usuario,
                 deviceType,
                 deviceFingerprint: meta?.fingerprint,
                 refreshTokenHash: hash,
@@ -172,7 +177,7 @@ export class AuthService implements IAuthService {
             const access_token = this.jwtService.sign(payload, {
                 expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
                 secret: process.env.JWT_SECRET
-            }as JwtSignOptions);
+            } as JwtSignOptions);
 
             // Migración: crear sesión nueva y no volver a emitir formato viejo
             const newRefresh = await this.createRefreshSession(payload, typeDevice);
@@ -229,6 +234,7 @@ export class AuthService implements IAuthService {
     async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
         this.codes.set(code, {
+            userId: usuario.id,
             userUuid: usuario.uuid,
             sub: usuario.userName,
             rol: usuario.rol.map(r => r.codigo) as string[],
@@ -252,7 +258,6 @@ export class AuthService implements IAuthService {
     async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
         const stored = this.codes.get(code) as AuthCodeStored;
         if (!stored) return null;
-
 
         // generar JWT
         const payload = {
