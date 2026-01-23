@@ -1,28 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ContactoEntity } from './entities/contacto.entity';
-import { OrganizacionEntity } from './entities/organizacion.entity';
-import { TipoContactoEntity } from './entities/tipoContacto.entity';
-import { UsuarioEntity } from './entities/usuario.entity';
-import { ModuloEntity } from './entities/modulo.entity';
-import { SistemaEntity } from './entities/sistema.entity';
-import { OrganizacionContactoEntity } from './entities/organizacionContacto.entity';
-import { OrganizacionSistemaEntity } from './entities/organizacionSistema.entity';
-import { PermisoEntity } from './entities/permisos.entity';
-import { RolEntity } from './entities/rol.entity';
-import { RolModuloPermisoEntity } from './entities/rolModuloPermiso.entity';
-import { CuentaBancariaEntity } from './entities/cuentaBancaria.entity';
-import { FuncionalidadEntity } from './entities/funcionalidad.entity';
-import { RefreshSessionEntity } from './entities/RefreshSession.entity';
 import { VaultService } from '../secrets/vault.service';
+import { SecretsModule } from '../secrets/secrets.module';
 
 
 
 @Module({
     imports: [
+        SecretsModule,
         TypeOrmModule.forRootAsync({
+            imports: [SecretsModule],
             useFactory: async (vaultService: VaultService) => {
                 const dbSecrets = vaultService.getAllSecrets('database');
+                console.log(dbSecrets);
                 return {
                     type: 'postgres',
                     host: dbSecrets.DATABASE_HOST || process.env.DATABASE_HOST || 'localhost',
@@ -31,23 +21,6 @@ import { VaultService } from '../secrets/vault.service';
                     password: dbSecrets.DATABASE_PASSWORD || process.env.DATABASE_PASSWORD || 'desarrollo123',
                     database: dbSecrets.DATABASE_NAME || process.env.DATABASE_NAME || 'core_erp',
                     schema: dbSecrets.DATABASE_SCHEMA || process.env.DATABASE_SCHEMA || 'core',
-                    // entities: [
-                    //     ContactoEntity,
-                    //     CuentaBancariaEntity,
-                    //     ModuloEntity,
-                    //     RolModuloPermisoEntity,
-                    //     OrganizacionEntity,
-                    //     OrganizacionContactoEntity,
-                    //     OrganizacionSistemaEntity,
-                    //     PermisoEntity,
-                    //     RolEntity,
-                    //     RolModuloPermisoEntity,
-                    //     SistemaEntity,
-                    //     TipoContactoEntity,
-                    //     UsuarioEntity,
-                    //     FuncionalidadEntity,
-                    //     RefreshSessionEntity
-                    // ],
                     entities: [__dirname + '/entities/*.entity{.ts,.js}'],
                     synchronize: false,  // ← NO usar true en producción
                     // ✅ ACTIVAR LOGGING COMPLETO
@@ -64,9 +37,12 @@ import { VaultService } from '../secrets/vault.service';
                         statement_timeout: 10000,
                     },
                 }
-            }
+            },
+            inject: [VaultService],
         })
-    ]
+    ],
+    providers: [],
+    exports: [],
 })
 export class DatabaseModule {
     // This module can be used to configure database specific settings or providers

@@ -106,10 +106,20 @@ export class VaultService implements OnModuleInit {
    * Obtener todos los secretos de una ruta
    */
   getAllSecrets(path: string): VaultSecrets {
-    if (!this.isInitialized) {
-      return {};
+    const cached = this.secrets.get(path);
+
+    // If Vault is not ready or the path is empty, fall back to env vars
+    if (!this.isInitialized || !cached || Object.keys(cached).length === 0) {
+      this.logger.warn(`Using env fallback for secrets path: ${path}`);
+      // Return only env vars that look related to this path (same naming we expect)
+      const envCopy: VaultSecrets = {};
+      Object.keys(process.env).forEach((k) => {
+        envCopy[k] = process.env[k];
+      });
+      return envCopy;
     }
-    return this.secrets.get(path) || {};
+
+    return cached;
   }
 
   /**
