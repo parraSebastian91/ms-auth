@@ -3,6 +3,7 @@ https://docs.nestjs.com/modules
 */
 
 import { DynamicModule, Inject, Module, Type } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { IUsuarioRepository } from './domain/puertos/outbound/iUsuarioRepository.interface';
 import { IUsuarioService } from './domain/puertos/inbound/iUsuarioService.interface';
 import { IContactoRepository } from './domain/puertos/outbound/iContactoRepository.interface';
@@ -119,6 +120,7 @@ export class CoreModule {
             module: CoreModule,
             global: true,
             imports: [
+                CacheModule.register(),
                 ...modules,
             ],
             providers: [

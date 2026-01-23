@@ -25,12 +25,13 @@ import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
 import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
 import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
 import { ConfigModule as NestConfigModule } from '@nestjs/config';
-import { VaultService } from './secrets/vault.service';
+import { SecretsModule } from './secrets/secrets.module';
 import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
     imports: [
         DatabaseModule,
+        SecretsModule,
         HttpServerModule,
         MetricsModule,
         TypeOrmModule.forFeature([
@@ -55,7 +56,6 @@ import { MetricsModule } from './metrics/metrics.module';
         }),
     ],
     providers: [
-        VaultService,
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
@@ -66,7 +66,7 @@ import { MetricsModule } from './metrics/metrics.module';
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
         RefreshSessionRepositoryAdapter,
-        VaultService,
+        SecretsModule,
         MetricsModule,
     ],
 })

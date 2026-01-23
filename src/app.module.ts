@@ -16,6 +16,8 @@ import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepo
 import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
 import { HttpModule } from '@nestjs/axios';
+import { SecretsModule } from './infrastructure/secrets/secrets.module';
+import { VaultService } from './infrastructure/secrets/vault.service';
 
 @Module({
   imports: [
@@ -27,11 +29,16 @@ import { HttpModule } from '@nestjs/axios';
 
     }),
     CacheModule.register({
-      isGlobal: true,
-      store: redisStore,
-      host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
-      ttl: 60 * 60, // 1 hora por defecto
+      imports: [SecretsModule],
+      inject: [VaultService, redisStore],
+      useFactory: async (vaultService: VaultService) => ({
+        isGlobal: true,
+        store: redisStore,
+        host: vaultService.getSecret('redis', 'redis_host', process.env.REDIS_HOST || 'localhost'),
+        port: vaultService.getSecret('redis', 'redis_port', process.env.REDIS_PORT || '6379'),
+        ttl: vaultService.getSecret('redis', 'ttl', process.env.REDIS_TTL || '3600'), // 1 hora por defecto
+      }),
+
     }),
     CoreModule.register({
       modules: [InfraestructureModule],
@@ -42,9 +49,13 @@ import { HttpModule } from '@nestjs/axios';
         refreshSessionRepository: RefreshSessionRepositoryAdapter
       },
     }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'TU_SECRETO_AQUI',
-      signOptions: { expiresIn: '1h' },
+    JwtModule.registerAsync({
+      imports: [SecretsModule],
+      inject: [VaultService],
+      useFactory: async (vaultService: VaultService) => ({
+        secret: vaultService.getSecret('auth-service', 'jwt_secret', process.env.JWT_SECRET || 'TU_SECRETO_AQUI'),
+        signOptions: { expiresIn: '1h' },
+      }),
     }),
     HttpModule.register({
       timeout: 5000,
