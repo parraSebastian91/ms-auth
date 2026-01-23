@@ -24,11 +24,15 @@ import { UsuarioEntity } from './database/entities/usuario.entity';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
 import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
 import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
+import { ConfigModule as NestConfigModule } from '@nestjs/config';
+import { VaultService } from './secrets/vault.service';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
     imports: [
         DatabaseModule,
         HttpServerModule,
+        MetricsModule,
         TypeOrmModule.forFeature([
             ContactoEntity,
             CuentaBancariaEntity,
@@ -45,8 +49,13 @@ import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionReposi
             FuncionalidadEntity,
             RefreshSessionEntity
         ]),
+        NestConfigModule.forRoot({
+            isGlobal: true,
+            envFilePath: ['.env.dev', '.env'],
+        }),
     ],
     providers: [
+        VaultService,
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
@@ -56,7 +65,9 @@ import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionReposi
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter
+        RefreshSessionRepositoryAdapter,
+        VaultService,
+        MetricsModule,
     ],
 })
 export class InfraestructureModule { }
