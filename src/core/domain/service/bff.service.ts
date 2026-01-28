@@ -28,7 +28,7 @@ export class BffService implements IBffService {
         path: string,
         body: any,
         userId: string,
-        res: Response
+        token: string
     ): Promise<AxiosResponse<any, any>> {
         // Validar que el microservicio exista
         if (!this.microservices[service]) {
@@ -47,7 +47,7 @@ export class BffService implements IBffService {
             'Content-Type': 'application/json',
             'X-User-ID': userId,
             'X-Service': 'bff',
-            'authorization': `Bearer ${res.req['user'].accessToken}` || '',
+            'authorization': `Bearer ${token}` || '',
         };
 
         this.logger.log(`[${method}] ${service}/${path} (userId: ${userId})`);
