@@ -8,6 +8,6 @@ export interface IBffService {
         path: string,
         body: any,
         userId: string,
-        res: Response): Promise<AxiosResponse<any, any>>;
+        token: string): Promise<AxiosResponse<any, any>>;
 
 }

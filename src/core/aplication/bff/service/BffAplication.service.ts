@@ -19,14 +19,14 @@ export class BffAplicationService implements IBffAplication {
         path: string,
         body: any,
         userId: string,
-        res: Response) : Promise<any> {
+        token: string) : Promise<any> {
             return this.bffService.forwardRequest(
                 service,
                 method,
                 path,
                 body,
                 userId,
-                res
+                token
             );
     }
 
