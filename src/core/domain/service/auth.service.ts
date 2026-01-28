@@ -256,6 +256,9 @@ export class AuthService implements IAuthService {
     }
 
     async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
+
+        if (!code || code === '') throw new LoginError("Código de autorización inválido");
+
         const stored = this.codes.get(code) as AuthCodeStored;
         if (!stored) return null;
 
