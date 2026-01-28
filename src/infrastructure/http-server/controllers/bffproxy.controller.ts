@@ -56,12 +56,13 @@ export class BffProxyController {
     ) {
         const servicios = body;
         const userId = req['user']?.userId || null;
+        console.log(req['user'])
         const msRespuestas = await Promise.all(
             Object.keys(servicios).map((service) => {
                 this.logger.log(`Servicio solicitado: ${service}`);
                 const { metodo, ruta, body = {} } = servicios[service];
                 // normaliza: elimina el primer segmento (nombre del microservicio)
-                const rutaClean = (ruta || '').replace(/^\/+/, '');
+                const rutaClean = (this.replacePlaceholders(ruta, req['user']) || '').replace(/^\/+/, '');
                 const parts = rutaClean.split('/').filter(Boolean);
                 const servicio = parts.shift() || '';
                 const rutaNormalizada = parts.join('/') || '';
@@ -78,8 +79,8 @@ export class BffProxyController {
         );
         let response = {};
 
-                // Normalizar a objetos serializables (por ejemplo { status, data })
-        const payload = msRespuestas.map((r,i) => {
+        // Normalizar a objetos serializables (por ejemplo { status, data })
+        const payload = msRespuestas.map((r, i) => {
             if (r && typeof r === 'object' && 'data' in r) {
                 return { data: r.data };
             }
@@ -93,5 +94,15 @@ export class BffProxyController {
 
         return res.status(200).json(response);
     }
+
+    replacePlaceholders(route: string, context: Record<string, any>): string {
+        return route.replace(/:([a-zA-Z0-9_]+):?/g, (_, key) => {
+            const v = context?.[key];
+            return v === undefined || v === null ? '' : String(v);
+        });
+    }
+
 }
+
+
 
