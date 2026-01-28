@@ -17,6 +17,7 @@ import { IRefreshSessionRepository } from '../puertos/outbound/iRefreshSessionRe
 import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
 import { Id } from 'src/core/share/valueObject/id.valueObject';
 import { RefreshSession } from '../model/RefreshSession.model';
+import { InvalidcodeToken } from 'src/core/share/errors/InvalidCodeToken.error';
 
 interface AuthCodeStored {
     userId: Id;
@@ -257,10 +258,10 @@ export class AuthService implements IAuthService {
 
     async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
 
-        if (!code || code === '') throw new LoginError("Código de autorización inválido");
+        if (!code || code === '') throw new InvalidcodeToken("Código de autorización inválido");
 
         const stored = this.codes.get(code) as AuthCodeStored;
-        if (!stored) return null;
+        if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
 
         // generar JWT
         const payload = {
@@ -269,6 +270,7 @@ export class AuthService implements IAuthService {
             rol: stored.rol,
             permisos: stored.permisos
         };
+
         const accessToken = this.jwtService.sign(payload, { expiresIn: '1h', secret: process.env.JWT_SECRET });
         const refreshToken = await this.createRefreshSession(stored, typeDevice);
         // opcional: refresh token, persistencia, revocación
