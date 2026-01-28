@@ -7,6 +7,7 @@ import { QueryFailedError, TypeORMError } from "typeorm";
 import { UserExistError } from "src/core/share/errors/usuarioExistError.error";
 import { UserNotFoundError } from "src/core/share/errors/UserNotFound.error";
 import { ValidationError } from "src/core/share/errors/validation.error";
+import { InvalidcodeToken } from "src/core/share/errors/InvalidCodeToken.error";
 
 @Catch()
 export class CoreExceptionFilter implements ExceptionFilter {
@@ -59,6 +60,11 @@ export class CoreExceptionFilter implements ExceptionFilter {
         else if (exception instanceof UserNotFoundError) {
             Logger.warn(`UserNotFoundError error: ${exception.message}`);
             status = HttpStatus.NOT_FOUND;
+            message = exception.message;
+        }
+        else if (exception instanceof InvalidcodeToken) {
+            Logger.warn(`InvalidcodeToken error: ${exception.message}`);
+            status = HttpStatus.BAD_REQUEST;
             message = exception.message;
         }
         else if (exception instanceof ForbiddenException) {
