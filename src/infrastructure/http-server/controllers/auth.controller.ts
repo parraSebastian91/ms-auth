@@ -30,22 +30,17 @@ export class AuthController {
 
   @Post('callback')
   async callback(@Body() code: CallBackDTO, @Session() session: Record<string, any>, @Res() res: Response) {
-    try {
-      const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice);
+    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice);
 
-      if (!tokens) {
-        res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
-      }
-
-      // El token se queda en el servidor, NO se envía al cliente
-      session.accessToken = tokens.access_token;
-      session.refreshToken = tokens.refresh_token;
-
-      return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
+    if (!tokens) {
+      res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
     }
-    catch (error) {
-      return res.status(NestHttpStatus.BAD_REQUEST).json(new ApiResponse(NestHttpStatus.BAD_REQUEST, 'Error en el callback', null));
-    }
+
+    // El token se queda en el servidor, NO se envía al cliente
+    session.accessToken = tokens.access_token;
+    session.refreshToken = tokens.refresh_token;
+
+    return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
   }
 
 
