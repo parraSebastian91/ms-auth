@@ -21,14 +21,14 @@ export class AuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
+    const request = context.switchToHttp().getRequest<Request>();
+    
+    if (isPublic || request.path === '/metrics') {
       return true;
     }
-
-    const request = context.switchToHttp().getRequest<Request>();
     const session = this.extractSession(request);
     
-    this.logger.log(`Session completa:`, JSON.stringify(session || {}));
+    // this.logger.log(`Session completa:`, JSON.stringify(session || {}));
     
     if (!session) {
       throw new UnauthorizedException('No hay sesión activa. Por favor inicia sesión.');
@@ -39,7 +39,7 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('No hay token en la sesión.');
     }
 
-    this.logger.log(`Session accessToken (primeros 30 chars): ${session.accessToken?.substring(0, 30)}`);
+    // this.logger.log(`Session accessToken (primeros 30 chars): ${session.accessToken?.substring(0, 30)}`);
     
     try {
       // Validar el token usando el servicio de autenticación

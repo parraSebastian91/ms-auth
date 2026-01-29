@@ -3,7 +3,7 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 
 @Module({
   imports: [
-    PrometheusModule. register({
+    PrometheusModule.register({
       path: '/metrics',
       defaultMetrics: {
         enabled: true,
