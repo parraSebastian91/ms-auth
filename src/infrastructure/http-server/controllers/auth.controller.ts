@@ -2,7 +2,7 @@
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session, Logger, Req } from '@nestjs/common';
 import { IAuthAplication } from 'src/core/aplication/auth/authAplication.interface';
 import { AUTH_APLICATION } from 'src/core/core.module';
 import { CallBackDTO, LoginDto } from '../model/dto/login.dto';
@@ -18,7 +18,7 @@ import { Public } from '../decorators/public.decorator';
 export class AuthController {
 
   constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
-
+  private readonly logger = new Logger(AuthController.name);
   @Post('authenticate')
   async login(@Body() loginDto: LoginDto, @Res() res: Response) {
     const result = await this.authAplicationService.authetication(loginDto);
@@ -29,61 +29,48 @@ export class AuthController {
   }
 
   @Post('callback')
-  async callback(@Body() code: CallBackDTO, @Session() session: Record<string, any>, @Res() res: Response) {
+  async callback(
+    @Body() code: CallBackDTO,
+    @Session() session: Record<string, any>,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    this.logger.log('Callback recibido con código:', code);
+    
     const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice);
+    
+    this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({ 
+      hasTokens: !!tokens, 
+      keys: tokens ? Object.keys(tokens) : 'null',
+      access_token_sample: tokens?.access_token?.substring(0, 20) + '...' || 'null'
+    }));
 
     if (!tokens) {
-      res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
+      this.logger.error('Error: exchangeCodeForToken retornó null/undefined');
+      return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
     }
 
-    // El token se queda en el servidor, NO se envía al cliente
-    session.accessToken = tokens.access_token;
-    session.refreshToken = tokens.refresh_token;
+    const sess = (req as any).session;
+    sess.accessToken = tokens.access_token;
+    sess.refreshToken = tokens.refresh_token;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        sess.save((err: any) => {
+          if (err) {
+            this.logger.error('Error guardando sesión:', err);
+            return reject(err);
+          }
+          this.logger.log('Sesión guardada exitosamente:', { sessionId: sess.id });
+          resolve();
+        });
+      });
+    } catch (err) {
+      this.logger.error('Error en save() de sesión:', err);
+      return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error guardando sesión', null));
+    }
 
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
   }
 
-
-
-  // @Post('refresh')
-  // async refresh(@Body() token: RefreshDto, @Res() res: Response) {
-  //   const result = await this.authAplicationService.refreshToken(token.refresh_token, token.userId, token.typeDevice);
-  //   if (!result) {
-  //     return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
-  //   }
-  //   return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Token refrescado', result));
-  // }
-
-  // @Get('validate/:token')
-  // async validate(@Param('token') token: string, @Res() res: Response) {
-  //   const result = await this.authAplicationService.validateToken(token);
-  //   if (!result) {
-  //     return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
-  //   } else {
-  //     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Token Válido', result));
-  //   }
-  // }
-
-  // // POST /oauth/token
-  // @Get('token')
-  // async token(@Body() body: any, @Res() res: Response, @Session() session: Record<string, any>) {
-  //   // form encoded body expected
-  //   const { code, typeDevice } = body;
-
-  //   const tokenResult = await this.authAplicationService.exchangeCodeForToken(
-  //     code,
-  //     typeDevice
-  //   );
-
-  //   if (!tokenResult) {
-  //     return res.status(400).json({ error: 'invalid_grant' });
-  //   }
-
-  //   session.accessToken = tokenResult.access_token;
-  //   session.refreshToken = tokenResult.refresh_token;
-
-  //   return res.json({
-  //     msj: 'Autenticación exitosa'
-  //   });
-  // }
 }
