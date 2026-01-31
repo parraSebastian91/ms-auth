@@ -1,5 +1,5 @@
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, Raw, MoreThan, IsNull } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 import { IRefreshSessionRepository } from 'src/core/domain/puertos/outbound/iRefreshSessionRepository.interface';
 import { RefreshSessionEntity } from '../database/entities/RefreshSession.entity';
@@ -14,13 +14,17 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   }
 
   async findByUserAndDevice(userUuid: string, deviceType: string): Promise<RefreshSession | null> {
-    return await this.repo.findOne({
+   const found = await this.repo.findOne({
       where: {
         user: { usuarioUuid: userUuid },
-        deviceType: deviceType
+        deviceType,
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
       },
-      relations: ['user']
+      relations: ['user'],
     });
+
+    return found ? this.map(found) : null;
   }
 
   private map(e: RefreshSessionEntity): RefreshSession {
@@ -32,7 +36,10 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   async create(session: RefreshSession): Promise<RefreshSession> {
     const entity = this.repo.create(session);
     const saved = await this.repo.save(entity);
-    return this.map(saved);
+    return this.map(await this.repo.findOne({
+      where: { id: saved.id },
+      relations: ['user']
+    }));
   }
 
   async findById(sessionUuid: string): Promise<RefreshSession | null> {
@@ -54,6 +61,7 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   }
 
   async revokeAllUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
+    console.log(sessionUuid, deviceType)
     const qb = this.repo.createQueryBuilder()
       .update()
       .set({ revokedAt: () => 'now()' })
@@ -61,6 +69,7 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
       .andWhere('revoked_at IS NULL');
     if (deviceType) qb.andWhere('device_type = :deviceType', { deviceType });
     const res = await qb.execute();
+    console.log(res)
     return res.affected ?? 0;
   }
 

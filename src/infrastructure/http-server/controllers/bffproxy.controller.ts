@@ -87,7 +87,7 @@ export class BffProxyController {
         });
 
         payload.forEach((r, i) => {
-            this.logger.log(`Respuesta del servicio ${Object.keys(servicios)[i]}: ${JSON.stringify(r)}`);
+            //this.logger.log(`Respuesta del servicio ${Object.keys(servicios)[i]}: ${JSON.stringify(r)}`);
             response = { ...response, [Object.keys(servicios)[i]]: r.data || r };
         });
 

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Generated, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { UsuarioEntity } from './usuario.entity'; // ajusta ruta si difiere
 
 @Entity('auth_refresh_sessions')
@@ -7,7 +7,8 @@ export class RefreshSessionEntity {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @Column({ name: 'session_uuid', length: 36 })
+  @Column({ name: 'session_uuid' })
+  @Generated('uuid')
   sessionUuid: string;
 
   @Column({ name: 'session_id', length: 128 })

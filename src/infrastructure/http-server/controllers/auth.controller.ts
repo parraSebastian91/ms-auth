@@ -39,6 +39,7 @@ export class AuthController {
     @Session() session: Record<string, any>,
     @Res() res: Response
   ) {
+    console.log(session.id)
     const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice, session.id);
 
     this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({
@@ -72,21 +73,21 @@ export class AuthController {
   }
 
   @Get('logout')
-  async logout(@Req() req: Request, @Res() res: Response) {
-
-    this.logger.log('Iniciando logout para la sesión:');
-    const sess = (req as any).session;
-    await this.authAplicationService.revokeUserSessions(sess)
-    sess.accessToken = null;
-    sess.refreshToken = null;
-    sess.destroy((err: any) => {
+  async logout(
+    @Session() session: Record<string, any>,
+    @Res() res: Response
+  ) {
+    this.logger.log('Iniciando logout para la sesión:', session.id);
+    await this.authAplicationService.revokeUserSessions(session.id)
+    session.accessToken = null;
+    session.refreshToken = null;
+    session.destroy((err: any) => {
       if (err) {
         this.logger.error('Error destruyendo sesión:', err);
         return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error durante logout', null));
       }
     });
-
-    this.logger.log('Logout exitoso para la sesión');
+    this.logger.log('Logout exitoso para la sesión:', session.id);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Logout exitoso', null));
 
   }
