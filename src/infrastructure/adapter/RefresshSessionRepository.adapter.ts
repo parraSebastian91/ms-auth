@@ -53,11 +53,11 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     });
   }
 
-  async revokeAllUserSessions(userId: number, deviceType?: string): Promise<number> {
+  async revokeAllUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
     const qb = this.repo.createQueryBuilder()
       .update()
       .set({ revokedAt: () => 'now()' })
-      .where('user_id = :userId', { userId })
+      .where('session_uuid = :sessionUuid', { sessionUuid })
       .andWhere('revoked_at IS NULL');
     if (deviceType) qb.andWhere('device_type = :deviceType', { deviceType });
     const res = await qb.execute();

@@ -5,12 +5,15 @@ import { Request } from 'express';
 import { IAuthService } from '../../../core/domain/puertos/inbound/IAuthService.interface';
 import { AUTH_SERVICE } from '../../../core/core.module';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { TokenCacheService } from 'src/core/domain/service/token-cache.service';
+import { RefreshSession } from 'src/core/domain/model/RefreshSession.model';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly logger = new Logger(AuthGuard.name);
   constructor(
     @Inject(AUTH_SERVICE) private authService: IAuthService,
+    private tokenCacheService: TokenCacheService,
     private jwtService: JwtService,
     private reflector: Reflector,
   ) { }
@@ -26,14 +29,15 @@ export class AuthGuard implements CanActivate {
     if (isPublic || request.path === '/metrics') {
       return true;
     }
-    const session = this.extractSession(request);
+    const session = await this.extractSession(request);
     
     // this.logger.log(`Session completa:`, JSON.stringify(session || {}));
     
     if (!session) {
+      this.logger.error('No se encontró sesión en la solicitud');
       throw new UnauthorizedException('No hay sesión activa. Por favor inicia sesión.');
     }
-    
+    console.log(session)
     if (!session.accessToken) {
       this.logger.error('Session existe pero accessToken es null/undefined');
       throw new UnauthorizedException('No hay token en la sesión.');
@@ -44,7 +48,6 @@ export class AuthGuard implements CanActivate {
     try {
       // Validar el token usando el servicio de autenticación
       const userId = await this.authService.validateToken(session.accessToken);
-      this.logger.log(`authService.validateToken retornó userId:`, userId);
 
       if (!userId) {
         throw new UnauthorizedException('Token inválido o expirado');
@@ -65,7 +68,7 @@ export class AuthGuard implements CanActivate {
         roles: payload.rol || payload.roles || [],
         permissions: payload.permisos || payload.permissions || [],
         accessToken: session.accessToken,
-        typeDevice: session.typeDevice
+        typeDevice: ''
       };
 
       return true;
@@ -78,7 +81,12 @@ export class AuthGuard implements CanActivate {
     }
   }
 
-  private extractSession(request: Request): any {
-    return (request as any).session;
+  private async extractSession(request: Request): Promise<RefreshSession> {
+    const session = (request as any).session;
+    if(!session) {
+      this.logger.error('No se encontró objeto session en la solicitud');
+      return null;
+    }
+    return await this.tokenCacheService.getJson<RefreshSession>(`session:${session.id}`);
   }
 }

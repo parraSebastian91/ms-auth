@@ -18,6 +18,8 @@ import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/Refres
 import { HttpModule } from '@nestjs/axios';
 import { SecretsModule } from './infrastructure/secrets/secrets.module';
 import { VaultService } from './infrastructure/secrets/vault.service';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { LogginInterceptor } from './infrastructure/http-server/loggin.interceptor';
 
 @Module({
   imports: [
@@ -62,6 +64,11 @@ import { VaultService } from './infrastructure/secrets/vault.service';
       maxRedirects: 5,
     }),
   ],
-  providers: [],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LogginInterceptor,
+    },
+  ],
 })
 export class AppModule { }

@@ -12,7 +12,6 @@ import { SecretsModule } from '../secrets/secrets.module';
             imports: [SecretsModule],
             useFactory: async (vaultService: VaultService) => {
                 const dbSecrets = vaultService.getAllSecrets('database');
-                console.log(dbSecrets);
                 return {
                     type: 'postgres',
                     host: dbSecrets.DATABASE_HOST || process.env.DATABASE_HOST || 'localhost',

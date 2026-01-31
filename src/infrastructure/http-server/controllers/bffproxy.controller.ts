@@ -56,7 +56,6 @@ export class BffProxyController {
     ) {
         const servicios = body;
         const userId = req['user']?.userId || null;
-        console.log(req['user'])
         const msRespuestas = await Promise.all(
             Object.keys(servicios).map((service) => {
                 this.logger.log(`Servicio solicitado: ${service}`);

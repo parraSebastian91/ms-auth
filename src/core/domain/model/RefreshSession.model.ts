@@ -3,6 +3,7 @@ import { UsuarioEntity } from "src/infrastructure/database/entities/usuario.enti
 export class RefreshSession {
   id?: number;
   sessionUuid?: string;
+  sessionId: string;
   user: UsuarioEntity;
   deviceType: string;
   deviceFingerprint?: string;
@@ -15,4 +16,5 @@ export class RefreshSession {
   rotationParentId?: number;
   createdAt?: Date;
   updatedAt?: Date;
+  accessToken?: string;
 }

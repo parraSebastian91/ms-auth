@@ -8,7 +8,7 @@ import { AUTH_APLICATION } from 'src/core/core.module';
 import { CallBackDTO, LoginDto } from '../model/dto/login.dto';
 import { ApiResponse } from '../model/api-response.model';
 import { Response } from 'express';
-import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/contacto.filter';
+import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/CoreException.filter';
 import { Public } from '../decorators/public.decorator';
 
 
@@ -19,8 +19,13 @@ export class AuthController {
 
   constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
   private readonly logger = new Logger(AuthController.name);
+
   @Post('authenticate')
-  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
+  async login(
+    @Body() loginDto: LoginDto, 
+    @Res() res: Response
+  ) {
+    this.logger.log('Iniciando autenticación para usuario:', loginDto.username);
     const result = await this.authAplicationService.authetication(loginDto);
     if (!result) {
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
@@ -32,17 +37,14 @@ export class AuthController {
   async callback(
     @Body() code: CallBackDTO,
     @Session() session: Record<string, any>,
-    @Req() req: Request,
     @Res() res: Response
   ) {
-    this.logger.log('Callback recibido con código:', code);
-    
-    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice);
-    
-    this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({ 
-      hasTokens: !!tokens, 
+    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice, session.id);
+
+    this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({
+      hasTokens: !!tokens,
       keys: tokens ? Object.keys(tokens) : 'null',
-      access_token_sample: tokens?.access_token?.substring(0, 20) + '...' || 'null'
+      access_token_sample: tokens?.accessToken?.substring(0, 20) + '...' || 'null'
     }));
 
     if (!tokens) {
@@ -50,27 +52,43 @@ export class AuthController {
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
     }
 
-    const sess = (req as any).session;
-    sess.accessToken = tokens.access_token;
-    sess.refreshToken = tokens.refresh_token;
+    // ✅ MARCAR LA SESIÓN COMO AUTENTICADA
+    session.authenticated = true;
+    session.accessToken = tokens.accessToken; // si lo tienes en el response
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        sess.save((err: any) => {
-          if (err) {
-            this.logger.error('Error guardando sesión:', err);
-            return reject(err);
-          }
-          this.logger.log('Sesión guardada exitosamente:', { sessionId: sess.id });
-          resolve();
-        });
+    // ✅ FORZAR GUARDADO EXPLÍCITO
+    await new Promise<void>((resolve, reject) => {
+      session.save((err: any) => {
+        if (err) {
+          this.logger.error('Error guardando sesión:', err);
+          return reject(err);
+        }
+        this.logger.log(`✅ Sesión guardada con ID: ${session.id}`);
+        resolve();
       });
-    } catch (err) {
-      this.logger.error('Error en save() de sesión:', err);
-      return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error guardando sesión', null));
-    }
+    });
 
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
+  }
+
+  @Get('logout')
+  async logout(@Req() req: Request, @Res() res: Response) {
+
+    this.logger.log('Iniciando logout para la sesión:');
+    const sess = (req as any).session;
+    await this.authAplicationService.revokeUserSessions(sess)
+    sess.accessToken = null;
+    sess.refreshToken = null;
+    sess.destroy((err: any) => {
+      if (err) {
+        this.logger.error('Error destruyendo sesión:', err);
+        return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error durante logout', null));
+      }
+    });
+
+    this.logger.log('Logout exitoso para la sesión');
+    return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Logout exitoso', null));
+
   }
 
 }
