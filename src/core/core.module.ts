@@ -133,6 +133,7 @@ export class CoreModule {
                 bffServiceProvider,
             ],
             exports: [
+                TokenCacheService,
                 USUARIO_APPLICATION,
                 AUTH_APLICATION,
                 AUTH_SERVICE,

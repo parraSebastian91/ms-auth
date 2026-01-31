@@ -1,7 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from './infrastructure/http-server/pipes/validation.pipe';
-const session = require('express-session');
+
+import * as session from 'express-session';
+import { createClient } from 'redis';
+
+const { RedisStore } = require('connect-redis');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,22 +18,48 @@ async function bootstrap() {
   app.enableCors({
     origin: FRONTEND_ORIGIN,
     credentials: true,
+    exposedHeaders: ['Set-Cookie'],
+    allowedHeaders: ['Content-Type', 'Origin', 'Accept', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+
   });
+
+  const redisUrl = `redis://${process.env.REDIS_HOST || 'seis_erp_redis'}:${process.env.REDIS_PORT || 6379}`;
+  // Cliente Redis para sesiones
+  const redisClient = createClient({
+    url: redisUrl
+  });
+
+  redisClient.on('error', (err) => console.error('Redis Client Error', err));
+
+  try {
+    await redisClient.connect();
+    console.log(`✅ Conectado a Redis en: ${redisUrl}`);
+  } catch (error) {
+    console.error('❌ Error conectando a Redis:', error);
+    throw error; // Detener si Redis no está disponible
+  }
 
   app.use(
     session({
-      name: process.env.SESSION_NAME || 'sid',
+      store: new RedisStore({
+        client: redisClient,
+        prefix: 'sess:',
+        ttl: 36000 // TTL en segundos (1 hora)
+      }),
+      name: 'auth.sid',
       secret: process.env.SECRET_SESSION || 'default_secret',
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        secure: isProd,                   // true en producción (HTTPS / Kong TLS)
-        sameSite: 'strict', // 'none' + secure en cross-site prod; 'lax' en dev
+        secure: false,
+        sameSite: 'lax',
         maxAge: 3600000,
+        path: '/',
       },
     })
-  )
+  );
   app.getHttpAdapter().getInstance().set('trust proxy', true); // o true si está detrás de un proxy
 
   // app.use((req, res, next) => {

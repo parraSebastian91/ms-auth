@@ -10,6 +10,9 @@ export class RefreshSessionEntity {
   @Column({ name: 'session_uuid', length: 36 })
   sessionUuid: string;
 
+  @Column({ name: 'session_id', length: 128 })
+  sessionId: string;
+
   //   @Index()
   //   @Column({ name: 'user_id', type: 'bigint' })
   //   userId: number;

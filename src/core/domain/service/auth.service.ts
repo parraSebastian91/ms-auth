@@ -3,7 +3,7 @@ https://docs.nestjs.com/providers#services
 */
 
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TokenCacheService } from './token-cache.service';
 import { UsuarioModel } from '../model/usuario.model';
 import { IAuthService } from '../puertos/inbound/IAuthService.interface';
@@ -20,8 +20,10 @@ import { RefreshSession } from '../model/RefreshSession.model';
 import { InvalidcodeToken } from 'src/core/share/errors/InvalidCodeToken.error';
 
 interface AuthCodeStored {
-    userId: Id;
+    userId: number;
     userUuid: string;
+    sessionId: string;
+    sessionUuid: string;
     sub: string;
     rol: string[];
     permisos: string[];
@@ -32,7 +34,9 @@ interface AuthCodeStored {
 
 @Injectable()
 export class AuthService implements IAuthService {
-    private codes = new Map<string, any>();
+    private readonly logger = new Logger(AuthService.name);
+    // private codes = new Map<string, any>();
+
     constructor(
         private usuarioRepository: IUsuarioRepository,
         private jwtService: JwtService,
@@ -44,22 +48,32 @@ export class AuthService implements IAuthService {
         return Number(process.env.JWT_REFRESH_DAYS ?? 7);
     }
     /** validar que el usuario no tenga mas de 1 session por dispositivo y validar en cache antes que en db */
-    private async createRefreshSession(user: AuthCodeStored, deviceType: string, meta?: { ip?: string, ua?: string, fingerprint?: string }) {
+    private async createRefreshSession(sessionActive: AuthCodeStored, deviceType: string, meta?: { ip?: string, ua?: string, fingerprint?: string }) {
         const secret = randomBytes(48).toString('hex');
         const hash = await bcrypt.hash(secret, 10);
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
+        let session = sessionActive;
+        let sessionHandler: { plainToken?: string, session?: RefreshSession } = {};
 
-        const existing = await this.refreshSessionRepo.findByUserAndDevice(user.userUuid, deviceType);
-        let plainToken = '';
-        if (existing) {
-            plainToken = await this.rotateSession(existing);
+        let sessionCache: RefreshSession = await this.tokenCacheService.getJson<RefreshSession>(`session:${session.sessionId}`);
+
+        if (!sessionCache) {
+            this.logger.log(`No se encontró sesión en cache para usuario ${session.userUuid} y dispositivo ${deviceType}, consultando en DB.`);
+            sessionCache = await this.refreshSessionRepo.findByUserAndDevice(session.userUuid, deviceType);
+        }
+
+        if (sessionCache) {
+            this.logger.log(`Usuario ${session.userUuid} ya tiene sesión activa para dispositivo ${deviceType}, realizando rotación.`);
+            sessionHandler = await this.rotateSession(sessionCache);
         } else {
+            this.logger.log(`Creando nueva sesión para usuario ${session.userUuid} en dispositivo ${deviceType}.`);
             const usuario = new UsuarioEntity();
-            usuario.usuarioUuid = user.userUuid;
-            usuario.id = Number(user.userId.getValue());
+            usuario.usuarioUuid = session.userUuid;
+            usuario.id = session.userId;
 
-            const session = await this.refreshSessionRepo.create({
+            const sessionRepo = await this.refreshSessionRepo.create({
                 user: usuario,
+                sessionId: session.sessionId,
                 deviceType,
                 deviceFingerprint: meta?.fingerprint,
                 refreshTokenHash: hash,
@@ -68,23 +82,39 @@ export class AuthService implements IAuthService {
                 expiresAt
             });
 
-            plainToken = `${session.sessionUuid}.${secret}`;
+            sessionHandler.plainToken = `${sessionRepo.sessionUuid}.${secret}`;
+            sessionHandler.session = sessionRepo;
 
+            this.logger.log(`Sesión creada para usuario ${session.userUuid} en dispositivo ${deviceType}.`);
             // Cache ligera (sin secreto)
-            await this.tokenCacheService.setJson(
-                `refresh_session:${session.sessionUuid}`,
-                { userId: user.userUuid, deviceType, exp: session.expiresAt.toISOString(), revoked: 0 },
-                Math.floor((expiresAt.getTime() - Date.now()) / 1000)
-            );
+
         }
-        return plainToken;
+
+
+        const accessToken = this.jwtService.sign({
+            userId: sessionHandler.session.user.id,
+            username: sessionCache.user.userName,
+            userUuid: sessionCache.user.usuarioUuid,
+            roles: sessionActive.rol,
+            permissions: sessionActive.permisos,
+            typeDevice: session.typeDevice
+        }, { expiresIn: '1h', secret: process.env.JWT_SECRET })
+
+
+        await this.tokenCacheService.setJson(
+            `session:${session.sessionId}`,
+            { accessToken }
+        ).then(() => {
+            this.logger.log(`Sesión cacheada para usuario ${session.userUuid} con clave session:${session.sessionId}`);
+        });
+        return { accessToken, refreshToken: `${session.sessionUuid}.${secret}` };
     }
 
     private async rotateSession(oldSession: RefreshSession) {
         // Revocar anterior
         // implementar revokeById en refreshSessionRepo
-        await this.refreshSessionRepo.revokeById(oldSession.sessionUuid);
-        await this.tokenCacheService.deleteKey(`refresh_session:${oldSession.sessionUuid}`);
+        this.refreshSessionRepo.revokeById(oldSession.sessionUuid);
+        this.tokenCacheService.deleteKey(`session:${oldSession.sessionId}`);
 
         // Crear nueva sesión encadenada (rotationParentId)
         const secret = randomBytes(48).toString('hex');
@@ -93,6 +123,7 @@ export class AuthService implements IAuthService {
 
         const newSession = await this.refreshSessionRepo.rotate(oldSession, {
             user: oldSession.user,
+            sessionId: oldSession.sessionId,
             deviceType: oldSession.deviceType,
             deviceFingerprint: oldSession.deviceFingerprint,
             refreshTokenHash: hash,
@@ -102,19 +133,14 @@ export class AuthService implements IAuthService {
             rotationParentId: oldSession.id
         });
 
-        const plainToken = `${newSession.id}.${secret}`;
-        await this.tokenCacheService.setJson(
-            `refresh_session:${newSession.id}`,
-            { user: newSession.user, deviceType: newSession.deviceType, exp: expiresAt.toISOString(), revoked: 0 },
-            Math.floor((expiresAt.getTime() - Date.now()) / 1000)
-        );
-        return plainToken;
+        const plainToken = `${newSession.sessionId}.${secret}`;
+        return { plainToken, session: newSession };
     }
 
     /** Actualizarpara flujo nuevo
      * validar token en cache, si no existe validar en db. no en ambos de igual manera. 
      */
-    async refreshToken(token: string, userId: string, typeDevice: string): Promise<{ access_token: string, refresh_token: string } | null> {
+    async refreshToken(token: string, userId: string, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
         try {
             // Nuevo flujo híbrido
             if (token.includes('.')) {
@@ -123,7 +149,7 @@ export class AuthService implements IAuthService {
                 if (!sessionUuid || !secret) return null;
 
                 // Cache lookup
-                const cacheKey = `refresh_session:${sessionUuid}`;
+                const cacheKey = `session:${sessionUuid}`;
                 const cached = await this.tokenCacheService.getJson(cacheKey);
                 let session = null;
 
@@ -152,14 +178,14 @@ export class AuthService implements IAuthService {
                     rol: usuario.rol.map(r => r.nombre),
                     permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : [])
                 };
-                const access_token = this.jwtService.sign(payload, {
+                const accessToken = this.jwtService.sign(payload, {
                     expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
                     secret: process.env.JWT_SECRET
                 } as JwtSignOptions);
 
                 // Rotación
                 const newRefresh = await this.rotateSession(session);
-                return { access_token, refresh_token: newRefresh };
+                return { accessToken, refreshToken: newRefresh.plainToken };
             }
 
             // Fase transitoria: si token viejo (sin '.')
@@ -175,17 +201,16 @@ export class AuthService implements IAuthService {
                 rol: usuario.rol.map(r => r.nombre),
                 permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : []),
             } as AuthCodeStored;
-            const access_token = this.jwtService.sign(payload, {
-                expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
-                secret: process.env.JWT_SECRET
-            } as JwtSignOptions);
 
             // Migración: crear sesión nueva y no volver a emitir formato viejo
             const newRefresh = await this.createRefreshSession(payload, typeDevice);
             // Revoca cache legacy
             await this.tokenCacheService.deleteRefreshToken(userId, typeDevice);
-
-            return { access_token, refresh_token: newRefresh };
+            const accessToken = this.jwtService.sign(newRefresh[1], {
+                expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
+                secret: process.env.JWT_SECRET
+            } as JwtSignOptions);
+            return { accessToken, refreshToken: newRefresh[0] };
         } catch {
             return null;
         }
@@ -201,7 +226,7 @@ export class AuthService implements IAuthService {
     }
 
 
-    async authetication(username: string, password: string, typeDevice: string, code_challenge: string): Promise<{ code: string, url: string }[] | null> {
+    async authetication(username: string, password: string, typeDevice: string, code_challenge: string, sessionId: string): Promise<{ code: string, url: string }[] | null> {
         const usuarioDB = await this.usuarioRepository.getUsuarioByUsername(username);
         if (!usuarioDB) {
             throw new UserNotFoundError("Usuario no encontrado");
@@ -214,7 +239,8 @@ export class AuthService implements IAuthService {
         const code = await this.createAuthorizationCode(
             usuario,
             code_challenge,
-            typeDevice
+            typeDevice,
+            sessionId
         );
         const uris = await this.usuarioRepository
             .getSystemsByUsername(username)
@@ -230,20 +256,23 @@ export class AuthService implements IAuthService {
         return uris;
     }
 
-
-
-    async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string): Promise<string> {
+    async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, sessionId: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
-        this.codes.set(code, {
-            userId: usuario.id,
-            userUuid: usuario.uuid,
-            sub: usuario.userName,
-            rol: usuario.rol.map(r => r.codigo) as string[],
-            permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []) as string[],
-            typeDevice,
-            codeChallenge,
-            createdAt: Date.now()
-        } as AuthCodeStored);
+        await this.tokenCacheService.setJson(
+            `auth_code:${code}`,
+            {
+                userId: usuario.id.getValue(),
+                userUuid: usuario.uuid,
+                sessionId,
+                sub: usuario.userName,
+                rol: usuario.rol.map(r => r.codigo) as string[],
+                permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []) as string[],
+                typeDevice,
+                codeChallenge,
+                createdAt: Date.now()
+            } as AuthCodeStored,
+            1000 * 10
+        );
         return code;
     }
 
@@ -256,26 +285,36 @@ export class AuthService implements IAuthService {
         return this.base64url(digest);
     }
 
-    async exchangeCodeForToken(code: string, typeDevice: string): Promise<{ access_token: string; refresh_token: string; } | null> {
-
+    async exchangeCodeForToken(code: string, typeDevice: string, sessionId: string, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<{ accessToken: string; refreshToken: string; } | null> {
         if (!code || code === '') throw new InvalidcodeToken("Código de autorización inválido");
 
-        const stored = this.codes.get(code) as AuthCodeStored;
+        const stored = await this.tokenCacheService.getJson<AuthCodeStored>(`auth_code:${code}`);
+        // const stored = this.codes.get(code) as AuthCodeStored;
         if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
 
-        // generar JWT
-        const payload = {
-            userUuid: stored.userUuid,
-            sub: stored.sub,
-            rol: stored.rol,
-            permisos: stored.permisos
-        };
+        stored.sessionId = sessionId;
+        // TODO: validar typeDevice si es necesario
 
-        const accessToken = this.jwtService.sign(payload, { expiresIn: '1h', secret: process.env.JWT_SECRET });
         const refreshToken = await this.createRefreshSession(stored, typeDevice);
-        // opcional: refresh token, persistencia, revocación
+
         // invalidar code (one-time)
-        this.codes.delete(code);
-        return { access_token: accessToken, refresh_token: refreshToken };
+        this.tokenCacheService.deleteKey(`auth_code:${code}`);
+        return refreshToken;
+    }
+
+    async revokeUserSessions(session: any): Promise<number> {
+        const infoToken: any = await this.jwtService.decode(session.accessToken);
+        this.logger.log(`Revoking sessions for userId: ${infoToken.sessionUuid}, deviceType: ${session.deviceType}`);
+        if (!infoToken) {
+            this.logger.warn(`No cache entry found for sessionUuid: ${session.sessionUuid}`);
+            return 0;
+        }
+        const response = Promise.all([
+            this.refreshSessionRepo.revokeAllUserSessions(infoToken.sessionUuid, session.deviceType),
+            this.tokenCacheService.deleteKey(`session:${infoToken.sessionUuid}`)
+        ]);
+        const [revokedCount] = await response;
+        this.logger.log(`Revoked ${revokedCount} sessions for userId: ${infoToken.userUuid}`);
+        return revokedCount;
     }
 }

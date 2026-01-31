@@ -17,6 +17,8 @@ export class LoginDto {
   @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
   @IsEnum(DeviceType, { message: "typeDevice debe ser uno de: WEB, DESKTOP, MOBILE, POSTMAN" })
   typeDevice: DeviceType;
+
+  sessionId: string;
 }
 
 export class CallBackDTO {

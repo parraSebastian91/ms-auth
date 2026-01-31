@@ -6,6 +6,6 @@ export interface IRefreshSessionRepository {
   findByUserAndDevice(userUuid: string, deviceType: string): Promise<RefreshSession | null>;
   revokeById(sessionUuid: string): Promise<void>;
   rotate(oldSession: RefreshSession, newSession: RefreshSession): Promise<RefreshSession>;
-  revokeAllUserSessions(userId: number, deviceType?: string): Promise<number>;
+  revokeAllUserSessions(sessionUuid: string, deviceType?: string): Promise<number>;
   deleteExpired(now?: Date): Promise<number>;
 }
