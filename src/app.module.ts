@@ -56,7 +56,6 @@ import { LogginInterceptor } from './infrastructure/http-server/loggin.intercept
       inject: [VaultService],
       useFactory: async (vaultService: VaultService) => ({
         secret: vaultService.getSecret('auth-service', 'jwt_secret', process.env.JWT_SECRET || 'TU_SECRETO_AQUI'),
-        signOptions: { expiresIn: '1h' },
       }),
     }),
     HttpModule.register({
