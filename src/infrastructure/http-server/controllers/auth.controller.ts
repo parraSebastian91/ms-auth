@@ -39,7 +39,6 @@ export class AuthController {
     @Session() session: Record<string, any>,
     @Res() res: Response
   ) {
-    console.log(session.id)
     const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice, session.id);
 
     this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({

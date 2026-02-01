@@ -47,9 +47,9 @@ export class AuthGuard implements CanActivate {
     
     try {
       // Validar el token usando el servicio de autenticación
-      const userId = await this.authService.validateToken(session.accessToken);
-
-      if (!userId) {
+      const token = await this.authService.validateToken(session.accessToken);
+      console.log(token)
+      if (!token) {
         throw new UnauthorizedException('Token inválido o expirado');
       }
 

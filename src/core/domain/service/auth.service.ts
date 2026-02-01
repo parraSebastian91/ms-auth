@@ -89,7 +89,10 @@ export class AuthService implements IAuthService {
             roles: sessionActive.rol,
             permissions: sessionActive.permisos,
             typeDevice: session.typeDevice
-        }, { expiresIn: '1h', secret: process.env.JWT_SECRET })
+        }, 
+        { 
+            expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET 
+        } as JwtSignOptions);
         await this.tokenCacheService.setJson(
             `session:${session.sessionId}`,
             { accessToken }

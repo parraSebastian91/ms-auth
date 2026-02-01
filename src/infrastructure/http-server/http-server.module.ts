@@ -18,8 +18,7 @@ import { SecretsModule } from '../secrets/secrets.module';
         TerminusModule,
         SecretsModule,
         JwtModule.register({
-            secret: process.env.JWT_SECRET || 'TU_SECRETO_AQUI',
-            signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '1h' } as JwtSignOptions,
+            secret: process.env.JWT_SECRET || 'TU_SECRETO_AQUI'
         }),
     ],
     controllers: [
