@@ -44,7 +44,11 @@ export class ContactoRepositoryAdapter implements IContactoRepository {
                 }
             });
     }
-
     
-    
+    async findByCorreo(correo: string): Promise<ContactoEntity | null> {
+        return this.contactoRepository.findOne({
+            where: { correo },
+            relations: ["usuario"]
+        });
+    }
 }

@@ -8,4 +8,19 @@ export interface IAuthAplication {
     authetication(loginDto: LoginDto): Promise<{ code: string, url: string }[] | null>;
     exchangeCodeForToken(code: string, codeVerifier: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null>;
     revokeUserSessions(session: RefreshSession): Promise<number>;
+    requestPasswordReset(
+        email: string,
+        ipAddress?: string,
+        userAgent?: string
+    ): Promise<{ message: string }>
+
+    validateResetToken(
+        token: string
+    ): Promise<{ valid: boolean }>
+
+    resetPassword(
+        token: string,
+        newPassword: string,
+        confirmPassword: string
+    ): Promise<{ message: string }>
 }

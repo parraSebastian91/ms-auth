@@ -2,7 +2,7 @@
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session, Logger, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session, Logger, Req, Headers, Ip, HttpCode, Query } from '@nestjs/common';
 import { IAuthAplication } from 'src/core/aplication/auth/authAplication.interface';
 import { AUTH_APLICATION } from 'src/core/core.module';
 import { CallBackDTO, LoginDto } from '../model/dto/login.dto';
@@ -10,6 +10,7 @@ import { ApiResponse } from '../model/api-response.model';
 import { Response } from 'express';
 import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/CoreException.filter';
 import { Public } from '../decorators/public.decorator';
+import { RequestPasswordResetDto, ResetPasswordDto, ValidateResetTokenDto } from '../model/dto/forgot-password.dto';
 
 
 @Controller('auth')
@@ -17,12 +18,14 @@ import { Public } from '../decorators/public.decorator';
 @Public() // Todas las rutas de auth son públicas
 export class AuthController {
 
-  constructor(@Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication) { }
+  constructor(@
+    Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthAplication  
+  ) { }
   private readonly logger = new Logger(AuthController.name);
 
   @Post('authenticate')
   async login(
-    @Body() loginDto: LoginDto, 
+    @Body() loginDto: LoginDto,
     @Res() res: Response
   ) {
     this.logger.log(`[authenticate] - [username]:${loginDto.username} - [typeDevice]:${loginDto.typeDevice}`);
@@ -40,7 +43,7 @@ export class AuthController {
     @Res() res: Response
   ) {
     this.logger.log(`INIT - [callback] - [sessionId]:${session.id}`);
-    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code,code.codeVerifier, code.typeDevice, session.id);
+    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.codeVerifier, code.typeDevice, session.id);
 
     if (!tokens) {
       this.logger.error('Error: exchangeCodeForToken retornó null/undefined');
@@ -83,7 +86,33 @@ export class AuthController {
     });
     this.logger.log('Logout exitoso para la sesión:', session.id);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Logout exitoso', null));
+  }
 
+  @Post('password-reset/request')
+  async requestPasswordReset(
+    @Body() dto: RequestPasswordResetDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.authAplicationService.requestPasswordReset(
+      dto.email,
+      ip,
+      userAgent,
+    );
+  }
+
+  @Get('password-reset/validate')
+  async validateToken(@Query() dto: ValidateResetTokenDto) {
+    return this.authAplicationService.validateResetToken(dto.token);
+  }
+
+  @Post('password-reset/reset')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authAplicationService.resetPassword(
+      dto.token,
+      dto.newPassword,
+      dto.confirmPassword,
+    );
   }
 
 }

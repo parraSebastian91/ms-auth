@@ -7,5 +7,19 @@ export interface IAuthService {
     authetication(username: string, password: string, typeDevice: string, code_challenge: string, sessionId: string): Promise<{ code: string, url: string }[] | null | null>;
     exchangeCodeForToken(code: string, codeVerifier: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null>;
     revokeUserSessions(session: RefreshSession): Promise<number>;
+
+    requestPasswordReset(
+        email: string,
+        ipAddress?: string,
+        userAgent?: string
+    ): Promise<{ message: string }>;
+
+    validateResetToken(token: string): Promise<{ valid: boolean; email?: string }>
+
+    resetPassword(
+        token: string,
+        newPassword: string,
+        confirmPassword: string
+    ): Promise<{ message: string }>;
 }
     

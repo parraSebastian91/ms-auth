@@ -19,6 +19,7 @@ import { BffService } from './domain/service/bff.service';
 import { HttpService } from '@nestjs/axios';
 import { IBffService } from './domain/puertos/inbound/IBffService.interface';
 import { BffAplicationService } from './aplication/bff/service/BffAplication.service';
+import { IPasswordResetRepository } from './domain/puertos/outbound/IPasswordResetRepository.interface';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -27,6 +28,7 @@ export type CoreModuleOptions = {
         contactoRepository: Type<IContactoRepository>;
         rolRepository: Type<IRolRepository>;
         refreshSessionRepository: Type<IRefreshSessionRepository>;
+        passwordResetRepository: Type<IPasswordResetRepository>;
     }
 }
 
@@ -48,7 +50,7 @@ export class CoreModule {
 
     static register(options: CoreModuleOptions): DynamicModule {
         const { adapters, modules } = options;
-        const { usuarioRepository, contactoRepository, rolRepository, refreshSessionRepository } = adapters;
+        const { usuarioRepository, contactoRepository, rolRepository, refreshSessionRepository, passwordResetRepository } = adapters;
 
         // Auth Service Provider
 
@@ -62,10 +64,23 @@ export class CoreModule {
 
         const authServiceProvider = {
             provide: AUTH_SERVICE,
-            useFactory(authRepository: IUsuarioRepository, tokenCacheService: TokenCacheService, refreshSessionRepository: IRefreshSessionRepository) {
-                return new AuthService(authRepository, new (require('@nestjs/jwt').JwtService)(), tokenCacheService, refreshSessionRepository);
+            useFactory(
+                authRepository: IUsuarioRepository, 
+                tokenCacheService: TokenCacheService, 
+                refreshSessionRepository: IRefreshSessionRepository,
+                contactoRepository: IContactoRepository,
+                passwordResetRepository: IPasswordResetRepository
+            ) {
+                return new AuthService(
+                    authRepository,
+                    new (require('@nestjs/jwt').JwtService)(),
+                    tokenCacheService,
+                    refreshSessionRepository,
+                    contactoRepository,
+                    passwordResetRepository
+                );
             },
-            inject: [usuarioRepository, TokenCacheService, refreshSessionRepository]
+            inject: [usuarioRepository, TokenCacheService, refreshSessionRepository, contactoRepository, passwordResetRepository]
         };
 
         // Usuario Service Provider
