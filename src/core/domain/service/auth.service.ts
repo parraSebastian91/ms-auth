@@ -375,7 +375,7 @@ export class AuthService implements IAuthService {
         );
 
         // Construir URL de restablecimiento
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8000'}/security/auth/password-reset/validate?token=${token}&uuid=${tokenUuid}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8000'}/pages/restablecer-password?token=${token}&uuid=${tokenUuid}`;
 
         // TODO: Enviar email con el enlace
         // await this.emailService.sendPasswordResetEmail(email, resetUrl, contacto.usuario.username);
