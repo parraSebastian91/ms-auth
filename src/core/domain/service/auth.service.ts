@@ -18,6 +18,7 @@ import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.enti
 import { Id } from 'src/core/share/valueObject/id.valueObject';
 import { RefreshSession } from '../model/RefreshSession.model';
 import { InvalidcodeToken } from 'src/core/share/errors/InvalidCodeToken.error';
+import { createHash } from 'crypto';
 
 interface AuthCodeStored {
     userId: number;
@@ -89,10 +90,10 @@ export class AuthService implements IAuthService {
             roles: sessionActive.rol,
             permissions: sessionActive.permisos,
             typeDevice: session.typeDevice
-        }, 
-        { 
-            expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET 
-        } as JwtSignOptions);
+        },
+            {
+                expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET
+            } as JwtSignOptions);
         await this.tokenCacheService.setJson(
             `session:${session.sessionId}`,
             { accessToken }
@@ -271,21 +272,32 @@ export class AuthService implements IAuthService {
     }
 
     private sha256base64url(input: string) {
-        const digest = bcrypt.createHash('sha256').update(input).digest();
+        const digest = createHash('sha256').update(input).digest();  // ✅ Cambiar bcrypt.createHash por createHash
         return this.base64url(digest);
     }
 
-    async exchangeCodeForToken(code: string, typeDevice: string, sessionId: string, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<{ accessToken: string; refreshToken: string; } | null> {
+    async exchangeCodeForToken(
+        code: string,
+        codeVerifier: string,
+        typeDevice: string,
+        sessionId: string,
+        meta?: { ip?: string, ua?: string, fingerprint?: string }
+    ): Promise<{ accessToken: string; refreshToken: string; } | null> {
         if (!code || code === '') throw new InvalidcodeToken("Código de autorización inválido");
 
         const stored = await this.tokenCacheService.getJson<AuthCodeStored>(`auth_code:${code}`);
         // const stored = this.codes.get(code) as AuthCodeStored;
         if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
 
+        const computedChallenge = this.sha256base64url(codeVerifier);
+        if (computedChallenge !== stored.codeChallenge) {
+            throw new InvalidcodeToken("Code verifier inválido (PKCE)");
+        }
+
         stored.sessionId = sessionId;
         // TODO: validar typeDevice si es necesario
 
-        const refreshToken = await this.createRefreshSession(stored, typeDevice);
+        const refreshToken = await this.createRefreshSession(stored, typeDevice, meta);
 
         // invalidar code (one-time)
         this.tokenCacheService.deleteKey(`auth_code:${code}`);

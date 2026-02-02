@@ -26,6 +26,8 @@ export class CallBackDTO {
   code: string;
   @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
   typeDevice: DeviceType;
+  @IsNotEmpty({ message: "El código de verificación es obligatorio" })
+  codeVerifier: string; 
 }
 
 

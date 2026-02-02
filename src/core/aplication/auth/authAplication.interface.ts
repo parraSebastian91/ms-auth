@@ -6,6 +6,6 @@ export interface IAuthAplication {
     refreshToken(token: string, userId: string, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null>;
     validateToken(token: string): Promise<string | null>;
     authetication(loginDto: LoginDto): Promise<{ code: string, url: string }[] | null>;
-    exchangeCodeForToken(code: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null>;
+    exchangeCodeForToken(code: string, codeVerifier: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null>;
     revokeUserSessions(session: RefreshSession): Promise<number>;
 }

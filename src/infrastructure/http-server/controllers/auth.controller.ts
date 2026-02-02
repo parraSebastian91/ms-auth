@@ -39,7 +39,7 @@ export class AuthController {
     @Session() session: Record<string, any>,
     @Res() res: Response
   ) {
-    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.typeDevice, session.id);
+    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code,code.codeVerifier, code.typeDevice, session.id);
 
     this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({
       hasTokens: !!tokens,
