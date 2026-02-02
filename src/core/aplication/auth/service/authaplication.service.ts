@@ -24,8 +24,8 @@ export class AuthAplicationService implements IAuthAplication {
         return this.authService.authetication(loginDto.username, loginDto.password, loginDto.typeDevice, loginDto.code_challenge, loginDto.sessionId);
     }
 
-    async exchangeCodeForToken(code: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null> {
-        return this.authService.exchangeCodeForToken(code, typeDevice, sessionId);
+    async exchangeCodeForToken(code: string, codeVerifier: string, typeDevice: string, sessionId: string): Promise<{ accessToken: string, refreshToken: string } | null> {
+        return this.authService.exchangeCodeForToken(code, codeVerifier, typeDevice, sessionId);
     }
 
     async revokeUserSessions(session: RefreshSession): Promise<number> {
