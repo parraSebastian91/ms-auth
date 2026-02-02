@@ -41,17 +41,19 @@ export class AuthAplicationService implements IAuthAplication {
     }
 
     async validateResetToken(
-        token: string
+        token: string,
+        uuid?: string
     ): Promise<{ valid: boolean }> {
-        return this.authService.validateResetToken(token);
+        return this.authService.validateResetToken(token, uuid);
     }
 
     async resetPassword(
         token: string,
+        uuid: string,
         newPassword: string,
         confirmPassword: string
     ): Promise<{ message: string }> {
-        return this.authService.resetPassword(token, newPassword, confirmPassword);
+        return this.authService.resetPassword(token, uuid, newPassword, confirmPassword);
     }
 
 
