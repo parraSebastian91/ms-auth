@@ -33,11 +33,11 @@ export class HealthController {
       // RSS memory (no debe superar 300MB)
       () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024),
       
-      // Disk health (debe tener al menos 50% libre)
+      // Disk health (debe tener al menos 90% libre)
       () =>
         this.disk.checkStorage('storage', {
           path: '/',
-          thresholdPercent: 0.5,
+          thresholdPercent: 0.9,
         }),
       
       // Vault health
