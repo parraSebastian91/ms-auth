@@ -20,6 +20,7 @@ import { SecretsModule } from './infrastructure/secrets/secrets.module';
 import { VaultService } from './infrastructure/secrets/vault.service';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { LogginInterceptor } from './infrastructure/http-server/loggin.interceptor';
+import { PasswordResetRepositoryAdapter } from './infrastructure/adapter/passwordResetRepository.adapter';
 
 @Module({
   imports: [
@@ -48,7 +49,8 @@ import { LogginInterceptor } from './infrastructure/http-server/loggin.intercept
         usuarioRepository: UsuarioRepositoryAdapter,
         contactoRepository: ContactoRepositoryAdapter,
         rolRepository: RolRepositoryAdapter,
-        refreshSessionRepository: RefreshSessionRepositoryAdapter
+        refreshSessionRepository: RefreshSessionRepositoryAdapter,
+        passwordResetRepository: PasswordResetRepositoryAdapter,
       },
     }),
     JwtModule.registerAsync({

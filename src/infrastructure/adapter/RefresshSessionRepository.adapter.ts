@@ -60,7 +60,7 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     });
   }
 
-  async revokeAllUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
+  async revokeUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
     console.log(sessionUuid, deviceType)
     const qb = this.repo.createQueryBuilder()
       .update()
@@ -71,6 +71,26 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     const res = await qb.execute();
     console.log(res)
     return res.affected ?? 0;
+  }
+
+  async revokeAllUserSessions(userId: string): Promise<number> {
+    const res = await this.repo.createQueryBuilder()
+      .update()
+      .set({ revokedAt: () => 'now()' })
+      .where('user_id = :userId', { userId })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+    return res.affected ?? 0;
+  }
+
+  async getSessionsByUserId(userId: string): Promise<RefreshSession[]> {
+    const sessions = await this.repo.createQueryBuilder()
+    .select('refreshSession')
+    .from(RefreshSessionEntity, 'refreshSession')
+    .where('refreshSession.user_id = :userId', { userId })
+    .andWhere('refreshSession.revoked_at IS NULL')
+    .getMany();
+    return sessions.map(s => this.map(s));
   }
 
   async deleteExpired(now: Date = new Date()): Promise<number> {

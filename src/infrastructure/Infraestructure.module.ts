@@ -27,6 +27,7 @@ import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionReposi
 import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import { SecretsModule } from './secrets/secrets.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
 
 @Module({
     imports: [
@@ -59,7 +60,8 @@ import { MetricsModule } from './metrics/metrics.module';
         UsuarioRepositoryAdapter,
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter
+        RefreshSessionRepositoryAdapter,
+        PasswordResetRepositoryAdapter
     ],
     exports: [
         UsuarioRepositoryAdapter,
@@ -68,6 +70,7 @@ import { MetricsModule } from './metrics/metrics.module';
         RefreshSessionRepositoryAdapter,
         SecretsModule,
         MetricsModule,
+        PasswordResetRepositoryAdapter
     ],
 })
 export class InfraestructureModule { }

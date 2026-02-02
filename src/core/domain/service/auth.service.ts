@@ -3,7 +3,7 @@ https://docs.nestjs.com/providers#services
 */
 
 
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { TokenCacheService } from './token-cache.service';
 import { UsuarioModel } from '../model/usuario.model';
 import { IAuthService } from '../puertos/inbound/IAuthService.interface';
@@ -19,6 +19,8 @@ import { Id } from 'src/core/share/valueObject/id.valueObject';
 import { RefreshSession } from '../model/RefreshSession.model';
 import { InvalidcodeToken } from 'src/core/share/errors/InvalidCodeToken.error';
 import { createHash } from 'crypto';
+import { IPasswordResetRepository } from '../puertos/outbound/IPasswordResetRepository.interface';
+import { IContactoRepository } from '../puertos/outbound/iContactoRepository.interface';
 
 interface AuthCodeStored {
     userId: number;
@@ -42,7 +44,9 @@ export class AuthService implements IAuthService {
         private usuarioRepository: IUsuarioRepository,
         private jwtService: JwtService,
         private tokenCacheService: TokenCacheService,
-        private refreshSessionRepo: IRefreshSessionRepository
+        private refreshSessionRepo: IRefreshSessionRepository,
+        private contactoRepository: IContactoRepository,
+        private passwordResetRepo: IPasswordResetRepository,
     ) { }
 
     private refreshTtlDays(): number {
@@ -314,17 +318,136 @@ export class AuthService implements IAuthService {
             return 0;
         }
         const decodedJWT: any = this.jwtService.decode(infoToken.accessToken);
-        this.logger.log(`Revoking sessions for userId: ${decodedJWT.sessionuuid}, deviceType: ${decodedJWT.typeDevice}`);
+        this.logger.log(`Revoking sessions for userId: ${decodedJWT.userUuid}, deviceType: ${decodedJWT.typeDevice}`);
         if (!decodedJWT) {
             this.logger.warn(`Failed to decode JWT for sessionUuid: ${decodedJWT.sessionuuid}`);
             return 0;
         }
         const response = Promise.all([
-            this.refreshSessionRepo.revokeAllUserSessions(decodedJWT.sessionuuid, decodedJWT.typeDevice),
+            this.refreshSessionRepo.revokeUserSessions(decodedJWT.userId, decodedJWT.typeDevice),
             this.tokenCacheService.deleteKey(`session:${sessionId}`)
         ]);
         const [revokedCount] = await response;
         this.logger.log(`session revoked for userId: ${decodedJWT.userUuid}`);
+
         return revokedCount;
+    }
+
+    async requestPasswordReset(
+        email: string,
+        ipAddress?: string,
+        userAgent?: string
+    ): Promise<{ message: string }> {
+        // Buscar usuario por email (necesitas agregar este método en usuarioRepository)
+        const contacto = await this.contactoRepository.findByCorreo(email);
+
+        if (!contacto) {
+            // Por seguridad, no revelar si el email existe o no
+            return {
+                message: 'Si el correo existe, recibirás un enlace de restablecimiento',
+            };
+        }
+
+        if (!contacto.usuario.activo) {
+            throw new BadRequestException('Usuario inactivo');
+        }
+
+        // Eliminar tokens anteriores del usuario
+        await this.passwordResetRepo.deleteUserTokens(contacto.usuario.id);
+
+        // Generar token único
+        const token = randomBytes(48).toString('hex');
+        const tokenHash = await bcrypt.hash(token, 10);
+
+        // Token válido por 1 hora
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        // Guardar token en BD
+        const { tokenUuid } = await this.passwordResetRepo.createResetToken(
+            contacto.usuario.id,
+            email,
+            tokenHash,
+            expiresAt,
+            ipAddress,
+            userAgent,
+        );
+
+        // Construir URL de restablecimiento
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8082'}/reset-password?token=${token}&uuid=${tokenUuid}`;
+
+        // TODO: Enviar email con el enlace
+        // await this.emailService.sendPasswordResetEmail(email, resetUrl, contacto.usuario.username);
+
+        console.log('🔐 Password Reset URL:', resetUrl);
+
+        return {
+            message: 'Si el correo existe, recibirás un enlace de restablecimiento',
+        };
+    }
+
+    async validateResetToken(token: string): Promise<{ valid: boolean; email?: string }> {
+        const tokenHash = await bcrypt.hash(token, 10);
+
+        const resetToken = await this.passwordResetRepo.findValidToken(tokenHash);
+
+        if (!resetToken) {
+            return { valid: false };
+        }
+
+        return {
+            valid: true,
+            email: resetToken.email,
+        };
+    }
+
+    async resetPassword(
+        token: string,
+        newPassword: string,
+        confirmPassword: string
+    ): Promise<{ message: string }> {
+        if (newPassword !== confirmPassword) {
+            throw new BadRequestException('Las contraseñas no coinciden');
+        }
+
+        // Validar token
+        const tokenHash = await bcrypt.hash(token, 10);
+        const resetToken = await this.passwordResetRepo.findValidToken(tokenHash);
+
+        if (!resetToken) {
+            throw new BadRequestException('Token inválido o expirado');
+        }
+
+        // Hash de la nueva contraseña
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        const usuario = await this.usuarioRepository.getUsuarioById(resetToken.userId);
+
+        if (!usuario) {
+            throw new BadRequestException('Usuario no encontrado');
+        }
+
+        usuario.password = passwordHash;
+
+        // Actualizar contraseña del usuario
+        await this.usuarioRepository.updateUsuario(resetToken.userId, usuario);
+
+        // Marcar token como usado
+        await this.passwordResetRepo.markTokenAsUsed(resetToken.id);
+
+        // TODO: Enviar email de confirmación
+        // await this.emailService.sendPasswordChangedConfirmation(resetToken.email);
+
+        // Invalidar todas las sesiones del usuario (opcional pero recomendado)
+        await this.refreshSessionRepo.revokeAllUserSessions(usuario.id.toString());
+
+        return {
+            message: 'Contraseña restablecida exitosamente',
+        };
+    }
+
+
+
+    async cleanupExpiredTokens(): Promise<void> {
+        await this.passwordResetRepo.deleteExpiredTokens();
     }
 }

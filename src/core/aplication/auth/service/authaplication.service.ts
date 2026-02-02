@@ -31,4 +31,28 @@ export class AuthAplicationService implements IAuthAplication {
     async revokeUserSessions(session: RefreshSession): Promise<number> {
         return this.authService.revokeUserSessions(session);
     }
+
+    async requestPasswordReset(
+        email: string,
+        ipAddress?: string,
+        userAgent?: string
+    ): Promise<{ message: string }> {
+        return this.authService.requestPasswordReset(email, ipAddress, userAgent);
+    }
+
+    async validateResetToken(
+        token: string
+    ): Promise<{ valid: boolean }> {
+        return this.authService.validateResetToken(token);
+    }
+
+    async resetPassword(
+        token: string,
+        newPassword: string,
+        confirmPassword: string
+    ): Promise<{ message: string }> {
+        return this.authService.resetPassword(token, newPassword, confirmPassword);
+    }
+
+
 }

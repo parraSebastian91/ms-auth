@@ -2,6 +2,7 @@ import { ContactoEntity } from "src/infrastructure/database/entities/contacto.en
 
 export interface IContactoRepository  {
     findById(id: number): Promise<ContactoEntity | null>;
+    findByCorreo(correo: string): Promise<ContactoEntity | null>;
     findAll(): Promise<ContactoEntity[] | null>;
     create(data: ContactoEntity): Promise<ContactoEntity>;
     update(id: number, data: ContactoEntity): Promise<ContactoEntity>;
