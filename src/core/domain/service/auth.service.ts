@@ -294,8 +294,11 @@ export class AuthService implements IAuthService {
             throw new InvalidcodeToken("Code verifier inválido (PKCE)");
         }
 
+        if (stored.typeDevice !== typeDevice) {
+            throw new InvalidcodeToken("Tipo de dispositivo no coincide");
+        }
+
         stored.sessionId = sessionId;
-        // TODO: validar typeDevice si es necesario
 
         const refreshToken = await this.createRefreshSession(stored, typeDevice, meta);
 

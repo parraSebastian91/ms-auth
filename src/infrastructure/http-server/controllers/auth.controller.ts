@@ -25,7 +25,7 @@ export class AuthController {
     @Body() loginDto: LoginDto, 
     @Res() res: Response
   ) {
-    this.logger.log('Iniciando autenticación para usuario:', loginDto.username);
+    this.logger.log(`[authenticate] - [username]:${loginDto.username} - [typeDevice]:${loginDto.typeDevice}`);
     const result = await this.authAplicationService.authetication(loginDto);
     if (!result) {
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
@@ -39,13 +39,8 @@ export class AuthController {
     @Session() session: Record<string, any>,
     @Res() res: Response
   ) {
+    this.logger.log(`INIT - [callback] - [sessionId]:${session.id}`);
     const tokens = await this.authAplicationService.exchangeCodeForToken(code.code,code.codeVerifier, code.typeDevice, session.id);
-
-    this.logger.log('exchangeCodeForToken retornó:', JSON.stringify({
-      hasTokens: !!tokens,
-      keys: tokens ? Object.keys(tokens) : 'null',
-      access_token_sample: tokens?.accessToken?.substring(0, 20) + '...' || 'null'
-    }));
 
     if (!tokens) {
       this.logger.error('Error: exchangeCodeForToken retornó null/undefined');
