@@ -36,12 +36,15 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
       ipAddress,
       userAgent,
     ]);
-    return { tokenUuid: result.rows[0].token_uuid };
+    console.log(result)
+    return { tokenUuid: result[0].token_uuid };
   }
 
-  async findValidToken(tokenHash: string): Promise<{
+  async findValidToken(uuid: string): Promise<{
     id: number;
     userId: number;
+    uuid: string;
+    tokenHash: string;
     email: string;
     expiresAt: Date;
     usedAt: Date | null;
@@ -50,19 +53,21 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
       SELECT 
         id,
         user_id as "userId",
+        token_uuid as "uuid",
+        token_hash as "tokenHash",
         email,
         expires_at as "expiresAt",
         used_at as "usedAt"
       FROM core.password_reset_tokens
-      WHERE token_hash = $1
+      WHERE token_uuid = $1
         AND expires_at > NOW()
         AND used_at IS NULL
       LIMIT 1
     `;
 
-    const result = await this.repo.query(query, [tokenHash]);
-
-    return result.rows[0] || null;
+    const result = await this.repo.query(query, [uuid]);
+    console.log(result)
+    return result[0] || null;
   }
 
   async markTokenAsUsed(tokenId: number): Promise<void> {

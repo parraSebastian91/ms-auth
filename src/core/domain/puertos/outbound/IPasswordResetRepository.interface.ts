@@ -8,9 +8,11 @@ export interface IPasswordResetRepository {
     userAgent?: string
   ): Promise<{ tokenUuid: string }>;
 
-  findValidToken(tokenHash: string): Promise<{
+  findValidToken(uuid: string): Promise<{
     id: number;
     userId: number;
+    uuid: string;
+    tokenHash: string;
     email: string;
     expiresAt: Date;
     usedAt: Date | null;

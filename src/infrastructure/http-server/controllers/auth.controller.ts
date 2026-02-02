@@ -95,7 +95,7 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ) {
     return this.authAplicationService.requestPasswordReset(
-      dto.email,
+      dto.correo,
       ip,
       userAgent,
     );
@@ -103,13 +103,14 @@ export class AuthController {
 
   @Get('password-reset/validate')
   async validateToken(@Query() dto: ValidateResetTokenDto) {
-    return this.authAplicationService.validateResetToken(dto.token);
+    return this.authAplicationService.validateResetToken(dto.token, dto.uuid);
   }
 
   @Post('password-reset/reset')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authAplicationService.resetPassword(
       dto.token,
+      dto.uuid,
       dto.newPassword,
       dto.confirmPassword,
     );

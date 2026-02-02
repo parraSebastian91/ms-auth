@@ -3,19 +3,26 @@ import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 export class RequestPasswordResetDto {
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  correo: string;
 }
 
 export class ValidateResetTokenDto {
   @IsString()
   @IsNotEmpty()
   token: string;
+  @IsString()
+  @IsNotEmpty()
+  uuid: string;
 }
 
 export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
   token: string;
+
+  @IsString()
+  @IsNotEmpty()
+  uuid: string;
 
   @IsString()
   @MinLength(8)

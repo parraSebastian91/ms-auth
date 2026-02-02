@@ -15,11 +15,13 @@ export interface IAuthAplication {
     ): Promise<{ message: string }>
 
     validateResetToken(
-        token: string
+        token: string,
+        uuid?: string
     ): Promise<{ valid: boolean }>
 
     resetPassword(
         token: string,
+        uuid: string,
         newPassword: string,
         confirmPassword: string
     ): Promise<{ message: string }>

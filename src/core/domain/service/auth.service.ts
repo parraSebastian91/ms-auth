@@ -343,12 +343,14 @@ export class AuthService implements IAuthService {
 
         if (!contacto) {
             // Por seguridad, no revelar si el email existe o no
+            this.logger.warn(`Password reset requested for non-existent email: ${email}`);
             return {
                 message: 'Si el correo existe, recibirás un enlace de restablecimiento',
             };
         }
 
         if (!contacto.usuario.activo) {
+            this.logger.warn("Usuario inactivo intenta solicitar restablecimiento de contraseña:", email);
             throw new BadRequestException('Usuario inactivo');
         }
 
@@ -373,7 +375,7 @@ export class AuthService implements IAuthService {
         );
 
         // Construir URL de restablecimiento
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8082'}/reset-password?token=${token}&uuid=${tokenUuid}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8000'}/security/auth/password-reset/validate?token=${token}&uuid=${tokenUuid}`;
 
         // TODO: Enviar email con el enlace
         // await this.emailService.sendPasswordResetEmail(email, resetUrl, contacto.usuario.username);
@@ -385,23 +387,20 @@ export class AuthService implements IAuthService {
         };
     }
 
-    async validateResetToken(token: string): Promise<{ valid: boolean; email?: string }> {
-        const tokenHash = await bcrypt.hash(token, 10);
+    async validateResetToken(token: string, uuid: string): Promise<{ valid: boolean; email?: string }> {
+        const resetToken = await this.passwordResetRepo.findValidToken(uuid);
+        if (!resetToken) return { valid: false };
 
-        const resetToken = await this.passwordResetRepo.findValidToken(tokenHash);
+        const ok = await bcrypt.compare(token, resetToken.tokenHash);
+        if (!ok) return { valid: false };
 
-        if (!resetToken) {
-            return { valid: false };
-        }
-
-        return {
-            valid: true,
-            email: resetToken.email,
-        };
+        return { valid: true, email: resetToken.email };
     }
+
 
     async resetPassword(
         token: string,
+        uuid: string,
         newPassword: string,
         confirmPassword: string
     ): Promise<{ message: string }> {
@@ -410,10 +409,13 @@ export class AuthService implements IAuthService {
         }
 
         // Validar token
-        const tokenHash = await bcrypt.hash(token, 10);
-        const resetToken = await this.passwordResetRepo.findValidToken(tokenHash);
-
+        const resetToken = await this.passwordResetRepo.findValidToken(uuid);
         if (!resetToken) {
+            throw new BadRequestException('Token inválido o expirado');
+        }
+
+        const ok = await bcrypt.compare(token, resetToken.tokenHash);
+        if (!ok) {
             throw new BadRequestException('Token inválido o expirado');
         }
 

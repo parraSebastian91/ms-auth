@@ -14,10 +14,11 @@ export interface IAuthService {
         userAgent?: string
     ): Promise<{ message: string }>;
 
-    validateResetToken(token: string): Promise<{ valid: boolean; email?: string }>
+    validateResetToken(token: string, uuid: string): Promise<{ valid: boolean; email?: string }>
 
     resetPassword(
         token: string,
+        uuid: string,
         newPassword: string,
         confirmPassword: string
     ): Promise<{ message: string }>;
