@@ -25,30 +25,27 @@ export class AuthGuard implements CanActivate {
     ]);
 
     const request = context.switchToHttp().getRequest<Request>();
-    
     if (isPublic || request.path === '/metrics') {
       return true;
     }
     const session = await this.extractSession(request);
-    
+
     // this.logger.log(`Session completa:`, JSON.stringify(session || {}));
-    
+
     if (!session) {
       this.logger.error('No se encontró sesión en la solicitud');
       throw new UnauthorizedException('No hay sesión activa. Por favor inicia sesión.');
     }
-    console.log(session)
     if (!session.accessToken) {
       this.logger.error('Session existe pero accessToken es null/undefined');
       throw new UnauthorizedException('No hay token en la sesión.');
     }
 
     // this.logger.log(`Session accessToken (primeros 30 chars): ${session.accessToken?.substring(0, 30)}`);
-    
+
     try {
       // Validar el token usando el servicio de autenticación
       const token = await this.authService.validateToken(session.accessToken);
-      console.log(token)
       if (!token) {
         throw new UnauthorizedException('Token inválido o expirado');
       }
@@ -70,6 +67,16 @@ export class AuthGuard implements CanActivate {
         accessToken: session.accessToken,
         typeDevice: ''
       };
+      // ✅ Calcular tiempos
+      const ahora = Math.floor(Date.now() / 1000); // timestamp actual en segundos
+      const iat = payload.iat || ahora; // issued at
+      const exp = payload.exp; // expiration time
+
+      const tiempoLogeado = ahora - iat; // segundos desde que se emitió
+      const tiempoRestante = exp - ahora; // segundos hasta expiración
+
+      this.logger.log(`⏱️ Token - Logeado: ${tiempoLogeado}s | Expira en: ${tiempoRestante}s`);
+      this.logger.log(`✅ Usuario autenticado: ${request['user'].username} (ID: ${request['user'].userId})`);
 
       return true;
     } catch (error) {
@@ -82,11 +89,11 @@ export class AuthGuard implements CanActivate {
   }
 
   private async extractSession(request: Request): Promise<RefreshSession> {
-    const session = (request as any).session;
-    if(!session) {
+    const session = request.cookies['auth.session'].split(':')[1].split('.')[0];
+    if (!session) {
       this.logger.error('No se encontró objeto session en la solicitud');
       return null;
     }
-    return await this.tokenCacheService.getJson<RefreshSession>(`session:${session.id}`);
+    return await this.tokenCacheService.getJson<RefreshSession>(`session:${session}`);
   }
 }

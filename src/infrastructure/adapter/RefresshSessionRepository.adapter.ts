@@ -14,7 +14,7 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   }
 
   async findByUserAndDevice(userUuid: string, deviceType: string): Promise<RefreshSession | null> {
-   const found = await this.repo.findOne({
+    const found = await this.repo.findOne({
       where: {
         user: { usuarioUuid: userUuid },
         deviceType,
@@ -43,7 +43,7 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   }
 
   async findById(sessionUuid: string): Promise<RefreshSession | null> {
-    const found = await this.repo.findOne({ where: { sessionUuid } });
+    const found = await this.repo.findOne({ where: { sessionUuid }, relations: ['user'] });
     return found ? this.map(found) : null;
   }
 
@@ -61,7 +61,6 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   }
 
   async revokeUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
-    console.log(sessionUuid, deviceType)
     const qb = this.repo.createQueryBuilder()
       .update()
       .set({ revokedAt: () => 'now()' })
@@ -69,7 +68,6 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
       .andWhere('revoked_at IS NULL');
     if (deviceType) qb.andWhere('device_type = :deviceType', { deviceType });
     const res = await qb.execute();
-    console.log(res)
     return res.affected ?? 0;
   }
 
@@ -85,11 +83,11 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
 
   async getSessionsByUserId(userId: string): Promise<RefreshSession[]> {
     const sessions = await this.repo.createQueryBuilder()
-    .select('refreshSession')
-    .from(RefreshSessionEntity, 'refreshSession')
-    .where('refreshSession.user_id = :userId', { userId })
-    .andWhere('refreshSession.revoked_at IS NULL')
-    .getMany();
+      .select('refreshSession')
+      .from(RefreshSessionEntity, 'refreshSession')
+      .where('refreshSession.user_id = :userId', { userId })
+      .andWhere('refreshSession.revoked_at IS NULL')
+      .getMany();
     return sessions.map(s => this.map(s));
   }
 

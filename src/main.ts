@@ -6,10 +6,12 @@ import * as session from 'express-session';
 import { createClient } from 'redis';
 
 const { RedisStore } = require('connect-redis');
+const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
+  app.use(cookieParser()); 
   // Deshabilitar CORS completamente
 
   const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4201';
@@ -47,7 +49,7 @@ async function bootstrap() {
         prefix: 'sess:',
         ttl: 36000 // TTL en segundos (1 hora)
       }),
-      name: 'auth.sid',
+      name: 'auth.session',
       secret: process.env.SECRET_SESSION || 'default_secret',
       resave: false,
       saveUninitialized: false,

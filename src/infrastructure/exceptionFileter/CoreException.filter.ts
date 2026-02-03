@@ -8,6 +8,7 @@ import { UserExistError } from "src/core/share/errors/usuarioExistError.error";
 import { UserNotFoundError } from "src/core/share/errors/UserNotFound.error";
 import { ValidationError } from "src/core/share/errors/validation.error";
 import { InvalidcodeToken } from "src/core/share/errors/InvalidCodeToken.error";
+import { LoginError } from "src/core/share/errors/LoginError.error";
 
 @Catch()
 export class CoreExceptionFilter implements ExceptionFilter {
@@ -70,6 +71,11 @@ export class CoreExceptionFilter implements ExceptionFilter {
         else if (exception instanceof ForbiddenException) {
             Logger.warn(`ForbiddenException error: ${exception.message}`);
             status = HttpStatus.FORBIDDEN;
+            message = exception.message;
+        }
+        else if (exception instanceof LoginError) {
+            Logger.warn(`Error: ${exception.message}`, exception.stack);
+            status = HttpStatus.BAD_REQUEST;
             message = exception.message;
         }
         else {

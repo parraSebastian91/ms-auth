@@ -16,7 +16,6 @@ export class BffProxyController {
         @Inject(BFF_APPLICATION) private readonly bffAplicationService: IBffAplication,
     ) { }
 
-
     @All(':service/*')
     async proxy(
         @Param('service') service: string,
