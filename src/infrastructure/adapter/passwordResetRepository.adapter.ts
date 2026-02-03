@@ -36,7 +36,6 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
       ipAddress,
       userAgent,
     ]);
-    console.log(result)
     return { tokenUuid: result[0].token_uuid };
   }
 
@@ -66,7 +65,6 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
     `;
 
     const result = await this.repo.query(query, [uuid]);
-    console.log(result)
     return result[0] || null;
   }
 

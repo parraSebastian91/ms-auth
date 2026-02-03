@@ -12,14 +12,14 @@ export class AuthAplicationService implements IAuthAplication {
 
     constructor(private authService: IAuthService) { }
 
-    async refreshToken(token: string, userId: string, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
-        return this.authService.refreshToken(token, userId, typeDevice);
-    }
+   async refreshSession(refreshToken: Record<string, any>, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
+        return this.authService.refreshSession(refreshToken,  typeDevice);
+   }      
 
     async validateToken(token: string): Promise<string | null> {
         return this.authService.validateToken(token);
     }
-
+    
     async authetication(loginDto: { username: string, password: string, typeDevice: string, code_challenge: string, sessionId: string }): Promise<{ code: string, url: string }[] | null> {
         return this.authService.authetication(loginDto.username, loginDto.password, loginDto.typeDevice, loginDto.code_challenge, loginDto.sessionId);
     }

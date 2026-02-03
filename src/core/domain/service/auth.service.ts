@@ -3,7 +3,7 @@ https://docs.nestjs.com/providers#services
 */
 
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { TokenCacheService } from './token-cache.service';
 import { UsuarioModel } from '../model/usuario.model';
 import { IAuthService } from '../puertos/inbound/IAuthService.interface';
@@ -15,12 +15,16 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { IRefreshSessionRepository } from '../puertos/outbound/iRefreshSessionRepository.interface';
 import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
-import { Id } from 'src/core/share/valueObject/id.valueObject';
 import { RefreshSession } from '../model/RefreshSession.model';
 import { InvalidcodeToken } from 'src/core/share/errors/InvalidCodeToken.error';
 import { createHash } from 'crypto';
 import { IPasswordResetRepository } from '../puertos/outbound/IPasswordResetRepository.interface';
 import { IContactoRepository } from '../puertos/outbound/iContactoRepository.interface';
+
+const COOKIES = {
+    REFRESH: 'auth.refresh',
+    SESSION: 'auth.session',
+}
 
 interface AuthCodeStored {
     userId: number;
@@ -33,6 +37,17 @@ interface AuthCodeStored {
     typeDevice: string;
     codeChallenge: string;
     createdAt: number;
+}
+
+interface AccessTokenPayload {
+    userId: number;
+    username: string;
+    userUuid: string;
+    sessionUuid: string;
+    sessionId: string;
+    roles: string[];
+    permissions: string[];
+    typeDevice: string;
 }
 
 @Injectable()
@@ -53,25 +68,31 @@ export class AuthService implements IAuthService {
         return Number(process.env.JWT_REFRESH_DAYS ?? 7);
     }
     /** validar que el usuario no tenga mas de 1 session por dispositivo y validar en cache antes que en db */
-    private async createRefreshSession(sessionActive: AuthCodeStored, deviceType: string, meta?: { ip?: string, ua?: string, fingerprint?: string }) {
-        const secret = randomBytes(48).toString('hex');
-        const hash = await bcrypt.hash(secret, 10);
+    private async createRefreshSession(
+        sessionActive: AuthCodeStored,
+        deviceType: string,
+        meta?: { ip?: string, ua?: string, fingerprint?: string })
+        : Promise<{ accessToken: string, refreshToken: string }> {
+        this.logger.log("INIT - CREATE REFRESH SESSION");
         const expiresAt = new Date(Date.now() + this.refreshTtlDays() * 86400000);
         let session = sessionActive;
         let sessionHandler: { plainToken?: string, session?: RefreshSession } = {};
-        let sessionCache: RefreshSession = this.jwtService.decode(await this.tokenCacheService.getRefreshToken(session.userId.toString(), deviceType)) as RefreshSession;
+        let sessionCache: RefreshSession = this.jwtService.decode(await this.tokenCacheService.getJson(`session:${session.sessionId}`)) as RefreshSession;
         if (!sessionCache) {
             this.logger.log(`session:${session.sessionId} - CACHE INACTIVA`);
             sessionCache = await this.refreshSessionRepo.findByUserAndDevice(session.userUuid, deviceType);
         }
         if (sessionCache) {
-            this.logger.log(`session:${session.sessionId} | REFRESH-SESION - ACTIVA - | ROTACION`);
+            sessionCache.sessionId = session.sessionId;
+            this.logger.log(`session:${session.sessionId} | DB SESSION ACTIVA - | ROTACION`);
             sessionHandler = await this.rotateSession(sessionCache);
         } else {
             this.logger.log(`session:${session.sessionId} | CREANDO`);
             const usuario = new UsuarioEntity();
             usuario.usuarioUuid = session.userUuid;
             usuario.id = session.userId;
+            const secret = randomBytes(48).toString('hex');
+            const hash = await bcrypt.hash(secret, 10);
             const sessionRepo = await this.refreshSessionRepo.create({
                 user: usuario,
                 sessionId: session.sessionId,
@@ -82,19 +103,22 @@ export class AuthService implements IAuthService {
                 userAgent: meta?.ua,
                 expiresAt
             });
-            sessionHandler.plainToken = `${sessionRepo.sessionUuid}.${secret}`;
+            sessionHandler.plainToken = `${sessionRepo.sessionId}.${sessionRepo.sessionUuid}.${secret}`;
             sessionHandler.session = sessionRepo;
             this.logger.log(`session:${session.sessionId} | SESSION OK`);
         }
-        const accessToken = this.jwtService.sign({
+        const payload: AccessTokenPayload = {
             userId: sessionHandler.session.user.id,
             username: sessionActive.sub,
             userUuid: sessionActive.userUuid,
-            sessionuuid: sessionHandler.session.sessionUuid,
+            sessionUuid: sessionHandler.session.sessionUuid,
+            sessionId: sessionHandler.session.sessionId,
             roles: sessionActive.rol,
             permissions: sessionActive.permisos,
             typeDevice: session.typeDevice
-        },
+        }
+        const accessToken = this.jwtService.sign(
+            payload,
             {
                 expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET
             } as JwtSignOptions);
@@ -104,10 +128,19 @@ export class AuthService implements IAuthService {
         ).then(() => {
             this.logger.log(`Sesión cacheada para usuario ${session.userUuid} con clave session:${session.sessionId}`);
         });
-        return { accessToken, refreshToken: `${session.sessionUuid}.${secret}` };
+
+        const refreshToken = this.jwtService.sign(
+            { refreshToken: sessionHandler.plainToken },
+            { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN, secret: process.env.JWT_REFRESH_SECRET } as JwtSignOptions);
+
+        this.logger.log("REFRESH SESSION - OK");
+        return { accessToken, refreshToken };
     }
 
     private async rotateSession(oldSession: RefreshSession) {
+        this.logger.log("ROTATE SESSION - INIT");
+        console.log("oldSession:");
+        console.log(oldSession);
         this.refreshSessionRepo.revokeById(oldSession.sessionUuid);
         this.tokenCacheService.deleteKey(`session:${oldSession.sessionId}`);
 
@@ -127,88 +160,82 @@ export class AuthService implements IAuthService {
             expiresAt,
             rotationParentId: oldSession.id
         });
-
-        const plainToken = `${newSession.sessionId}.${secret}`;
+        console.log("newSession:");
+        console.log(newSession);
+        const plainToken = `${newSession.sessionId}.${newSession.sessionUuid}.${secret}`;
         return { plainToken, session: newSession };
     }
 
     /** Actualizarpara flujo nuevo
      * validar token en cache, si no existe validar en db. no en ambos de igual manera. 
      */
-    async refreshToken(token: string, userId: string, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
-        try {
-            // Nuevo flujo híbrido
-            if (token.includes('.')) {
-                const [sessionIdStr, secret] = token.split('.');
-                const sessionUuid = sessionIdStr;
-                if (!sessionUuid || !secret) return null;
+    async refreshSession(token: Record<string, any>, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
+        this.logger.log("INIT - REFRESH SESSION");
+        console.log(token[COOKIES.REFRESH])
 
-                // Cache lookup
-                const cacheKey = `session:${sessionUuid}`;
-                const cached = await this.tokenCacheService.getJson(cacheKey);
-                let session = null;
-
-                if (cached) {
-                    if (cached.revoked === 1) return null;
-                    if (cached.deviceType !== typeDevice || String(cached.userId) !== userId) return null;
-                }
-
-                // Fetch DB (si no hay cache o para verificar hash)
-                session = await this.refreshSessionRepo.findById(sessionUuid);
-                if (!session) return null;
-                if (session.revokedAt) return null;
-                if (session.userId !== Number(userId) || session.deviceType !== typeDevice) return null;
-                if (session.expiresAt < new Date()) return null;
-
-                const ok = await bcrypt.compare(secret, session.refreshTokenHash);
-                if (!ok) return null;
-
-                // Cargar usuario
-                const usuarioDB = await this.usuarioRepository.getUsuarioById(Number(userId));
-                if (!usuarioDB) return null;
-                const usuario = UsuarioModel.create(usuarioDB);
-                const payload = {
-                    id: usuario.id.getValue(),
-                    sub: usuario.userName,
-                    rol: usuario.rol.map(r => r.nombre),
-                    permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : [])
-                };
-                const accessToken = this.jwtService.sign(payload, {
-                    expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
-                    secret: process.env.JWT_SECRET
-                } as JwtSignOptions);
-
-                // Rotación
-                const newRefresh = await this.rotateSession(session);
-                return { accessToken, refreshToken: newRefresh.plainToken };
-            }
-
-            // Fase transitoria: si token viejo (sin '.')
-            const storedToken = await this.tokenCacheService.getRefreshToken(userId, typeDevice);
-            if (!storedToken || storedToken !== token) return null;
-
-            const usuarioDB = await this.usuarioRepository.getUsuarioById(Number(userId));
-            if (!usuarioDB) return null;
-            const usuario = UsuarioModel.create(usuarioDB);
-            const payload = {
-                userUuid: usuario.uuid,
-                sub: usuario.userName,
-                rol: usuario.rol.map(r => r.nombre),
-                permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.nombre) : []),
-            } as AuthCodeStored;
-
-            // Migración: crear sesión nueva y no volver a emitir formato viejo
-            const newRefresh = await this.createRefreshSession(payload, typeDevice);
-            // Revoca cache legacy
-            await this.tokenCacheService.deleteRefreshToken(userId, typeDevice);
-            const accessToken = this.jwtService.sign(newRefresh[1], {
-                expiresIn: (payload.rol.includes("SUPER_ADMIN") || payload.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN,
-                secret: process.env.JWT_SECRET
-            } as JwtSignOptions);
-            return { accessToken, refreshToken: newRefresh[0] };
-        } catch {
-            return null;
+        if (this.jwtService.verify(token[COOKIES.REFRESH], { secret: process.env.JWT_REFRESH_SECRET }) == null) {
+            this.logger.error('INVALID REFRESH TOKEN FORMAT');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
         }
+
+        const decodedRefresh = this.jwtService.decode(token[COOKIES.REFRESH]) as { refreshToken: string } | null;
+        const [sessionId, sessionUuid, secret] = decodedRefresh.refreshToken.split('.');
+
+        let sessionCache: RefreshSession;
+        let sessionHandler: { plainToken?: string, session?: RefreshSession } = {};
+
+        if (!sessionId || !sessionUuid || !secret) {
+            this.logger.error('INVALID REFRESH TOKEN');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
+        }
+        sessionCache = await this.tokenCacheService.getJson(`session:${sessionId}`)
+
+        if (!sessionCache) {
+            this.logger.error('NO CACHED SESSION - GET DB refreshSession');
+        }
+        const refreshSession = await this.refreshSessionRepo.findById(sessionUuid);
+        if (!refreshSession || refreshSession.revokedAt || new Date(refreshSession.expiresAt) < new Date()) {
+            this.logger.error('NO SESSION FOUND FROM DB');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
+        }
+
+        const ok = await bcrypt.compare(secret, refreshSession.refreshTokenHash);
+
+        if (!ok) {
+            this.logger.error('INVALID REFRESH TOKEN SECRET');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
+        }
+        this.logger.log(`SESSION VALIDATED - ROTATING`);
+        const tokenDecode = await this.jwtService.decode(sessionCache.accessToken);
+        sessionHandler = await this.rotateSession(refreshSession);
+
+        const payload: AccessTokenPayload = {
+            userId: sessionHandler.session.user.id,
+            username: sessionHandler.session.user.userName,
+            userUuid: sessionHandler.session.user.usuarioUuid,
+            sessionUuid: sessionHandler.session.sessionUuid,
+            sessionId: sessionHandler.session.sessionId,
+            roles: tokenDecode.roles,
+            permissions: tokenDecode.permissions,
+            typeDevice: sessionHandler.session.deviceType
+        }
+        const accessToken = this.jwtService.sign(
+            payload,
+            {
+                expiresIn: (payload.permissions.includes("SUPER_ADMIN") || payload.roles.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET
+            } as JwtSignOptions);
+        await this.tokenCacheService.setJson(
+            `session:${payload.sessionId}`,
+            { accessToken }
+        ).then(() => {
+            this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
+        });
+
+        const refreshToken = this.jwtService.sign(
+            { refreshToken: sessionHandler.plainToken },
+            { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN, secret: process.env.JWT_REFRESH_SECRET } as JwtSignOptions
+        );
+        return { accessToken, refreshToken };
     }
 
     async validateToken(token: string): Promise<string | null> {
@@ -237,6 +264,7 @@ export class AuthService implements IAuthService {
             typeDevice,
             sessionId
         );
+
         const uris = await this.usuarioRepository
             .getSystemsByUsername(username)
             .then(data => {
@@ -250,7 +278,15 @@ export class AuthService implements IAuthService {
 
         return uris;
     }
-
+    /**
+     *  Crea un código de autorización de un solo uso y lo almacena en caché con un TTL corto.
+     * formato de almacenamiento: auth_code:${code}
+     * @param usuario 
+     * @param codeChallenge 
+     * @param typeDevice 
+     * @param sessionId 
+     * @returns 
+     */
     async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, sessionId: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
         await this.tokenCacheService.setJson(
@@ -280,6 +316,15 @@ export class AuthService implements IAuthService {
         return this.base64url(digest);
     }
 
+    /**
+     *  Intercambia un código de autorización por access token y refresh token.
+     * @param code 
+     * @param codeVerifier 
+     * @param typeDevice 
+     * @param sessionId 
+     * @param meta 
+     * @returns 
+     */
     async exchangeCodeForToken(
         code: string,
         codeVerifier: string,
@@ -287,6 +332,7 @@ export class AuthService implements IAuthService {
         sessionId: string,
         meta?: { ip?: string, ua?: string, fingerprint?: string }
     ): Promise<{ accessToken: string; refreshToken: string; } | null> {
+        this.logger.log("INIT - EXCHANGE CODE FOR TOKEN");
         if (!code || code === '') throw new InvalidcodeToken("Código de autorización inválido");
 
         const stored = await this.tokenCacheService.getJson<AuthCodeStored>(`auth_code:${code}`);
@@ -311,20 +357,26 @@ export class AuthService implements IAuthService {
         return refreshToken;
     }
 
+    /**
+     * Revoca todas las sesiones activas de un usuario dado su sessionId.
+     * @param sessionId 
+     * @returns 
+     */
     async revokeUserSessions(sessionId: any): Promise<number> {
+        this.logger.log(`LOGOUT - SessionId: ${sessionId}`);
         const infoToken: any = await this.tokenCacheService.getJson<any>(`session:${sessionId}`);
         if (!infoToken) {
-            this.logger.warn(`No cache entry found for sessionUuid: ${sessionId}`);
+            this.logger.warn(`NO SESSION: ${sessionId}`);
             return 0;
         }
         const decodedJWT: any = this.jwtService.decode(infoToken.accessToken);
-        this.logger.log(`Revoking sessions for userId: ${decodedJWT.userUuid}, deviceType: ${decodedJWT.typeDevice}`);
+        this.logger.log(`CERRANDO SESSION UUID: ${decodedJWT.userUuid} | deviceType: ${decodedJWT.typeDevice}`);
         if (!decodedJWT) {
-            this.logger.warn(`Failed to decode JWT for sessionUuid: ${decodedJWT.sessionuuid}`);
+            this.logger.warn(`Failed to decode JWT for sessionUuid: ${decodedJWT.sessionUuid}`);
             return 0;
         }
         const response = Promise.all([
-            this.refreshSessionRepo.revokeUserSessions(decodedJWT.userId, decodedJWT.typeDevice),
+            this.refreshSessionRepo.revokeUserSessions(decodedJWT.sessionUuid, decodedJWT.typeDevice),
             this.tokenCacheService.deleteKey(`session:${sessionId}`)
         ]);
         const [revokedCount] = await response;
@@ -333,6 +385,13 @@ export class AuthService implements IAuthService {
         return revokedCount;
     }
 
+    /**
+     * Restablece la contraseña de un usuario enviando un correo con un enlace seguro.
+     * @param email 
+     * @param ipAddress 
+     * @param userAgent 
+     * @returns 
+     */
     async requestPasswordReset(
         email: string,
         ipAddress?: string,
@@ -387,6 +446,12 @@ export class AuthService implements IAuthService {
         };
     }
 
+    /**
+     * Valida un token de restablecimiento de contraseña.
+     * @param token 
+     * @param uuid 
+     * @returns 
+     */
     async validateResetToken(token: string, uuid: string): Promise<{ valid: boolean; email?: string }> {
         const resetToken = await this.passwordResetRepo.findValidToken(uuid);
         if (!resetToken) return { valid: false };
@@ -397,7 +462,14 @@ export class AuthService implements IAuthService {
         return { valid: true, email: resetToken.email };
     }
 
-
+    /**
+     * Resetablece la contraseña de un usuario dado un token válido.
+     * @param token 
+     * @param uuid 
+     * @param newPassword 
+     * @param confirmPassword 
+     * @returns 
+     */
     async resetPassword(
         token: string,
         uuid: string,
