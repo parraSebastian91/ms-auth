@@ -139,8 +139,6 @@ export class AuthService implements IAuthService {
 
     private async rotateSession(oldSession: RefreshSession) {
         this.logger.log("ROTATE SESSION - INIT");
-        console.log("oldSession:");
-        console.log(oldSession);
         this.refreshSessionRepo.revokeById(oldSession.sessionUuid);
         this.tokenCacheService.deleteKey(`session:${oldSession.sessionId}`);
 
@@ -160,8 +158,6 @@ export class AuthService implements IAuthService {
             expiresAt,
             rotationParentId: oldSession.id
         });
-        console.log("newSession:");
-        console.log(newSession);
         const plainToken = `${newSession.sessionId}.${newSession.sessionUuid}.${secret}`;
         return { plainToken, session: newSession };
     }
@@ -171,7 +167,6 @@ export class AuthService implements IAuthService {
      */
     async refreshSession(token: Record<string, any>, typeDevice: string): Promise<{ accessToken: string, refreshToken: string } | null> {
         this.logger.log("INIT - REFRESH SESSION");
-        console.log(token[COOKIES.REFRESH])
 
         if (this.jwtService.verify(token[COOKIES.REFRESH], { secret: process.env.JWT_REFRESH_SECRET }) == null) {
             this.logger.error('INVALID REFRESH TOKEN FORMAT');

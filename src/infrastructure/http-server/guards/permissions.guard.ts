@@ -77,10 +77,6 @@ export class PermissionsGuard implements CanActivate {
             const tokenRoles = payload.rol || payload.roles || [];
             const tokenPermissions = payload.permisos || payload.permissions || [];
 
-            console.log('Token payload:', payload);
-            console.log('Roles del token (códigos):', tokenRoles);
-            console.log('Permisos del token (códigos):', tokenPermissions);
-
             // Si el token tiene información, usarla directamente (códigos)
             let userRoles = tokenRoles;
             let userPermissions = tokenPermissions;
