@@ -27,9 +27,6 @@ export class ContactoEntity {
     @Column({ type: 'text', name: 'url' })
     url: string;
 
-    @Column({ type: "character varying", name: 'imagen_base64' })
-    imgBase64: string;
-
     @OneToOne(() => UsuarioEntity, usuario => usuario.contacto)
     usuario: UsuarioEntity;
 
