@@ -24,9 +24,6 @@ export class ContactoDTO {
     @IsUrl({},{ message: "La URL debe ser una URL válida" })
     url: string;
 
-    @IsBase64({},{ message: "La imagen debe ser una cadena Base64 válida" })
-    imgBase64: string;
-
     @IsNotEmpty({ message: "El tipo de contacto es obligatorio" })
     @IsNumber({},{ message: "El tipo de contacto debe ser un número" })
     tipoContactoId: string;
