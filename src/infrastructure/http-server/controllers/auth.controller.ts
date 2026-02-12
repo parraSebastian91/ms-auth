@@ -12,6 +12,7 @@ import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/CoreExc
 import { Public } from '../decorators/public.decorator';
 import { RequestPasswordResetDto, ResetPasswordDto, ValidateResetTokenDto } from '../model/dto/forgot-password.dto';
 import { JwtService } from '@nestjs/jwt';
+import { authorizationCommand, LoginCommand, refreshSessionCommand, RequestPasswordResetCommand, ResetPasswordCommand, validateResetTokenCommand } from 'src/core/aplication/auth/command/AuthCommand.interface';
 
 interface bodyRefresh {
   typeDevice: string;
@@ -56,7 +57,12 @@ export class AuthController {
   ) {
     this.logger.log(`[session/refresh] - sessionId: ${session.id}`);
 
-    const tokens = await this.authAplicationService.refreshSession(req.cookies, body.typeDevice);
+    const command: refreshSessionCommand = {
+      tokens: req.cookies,
+      typeDevice: body.typeDevice
+    };
+
+    const tokens = await this.authAplicationService.refreshSession(command);
 
     if (!tokens) {
       this.logger.error('Refresh token inválido o expirado');
@@ -99,7 +105,14 @@ export class AuthController {
     @Res() res: Response
   ) {
     this.logger.log(`[authenticate] - [username]:${loginDto.username} - [typeDevice]:${loginDto.typeDevice}`);
-    const result = await this.authAplicationService.authetication(loginDto);
+    const command: LoginCommand = {
+      username: loginDto.username,
+      password: loginDto.password,
+      typeDevice: loginDto.typeDevice,
+      code_challenge: loginDto.code_challenge,
+      sessionId: loginDto.sessionId
+    };
+    const result = await this.authAplicationService.authetication(command);
     if (!result) {
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
     }
@@ -114,7 +127,6 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response
   ) {
-
     this.logger.log(`INIT - [callback] - [sessionId]:${session.id}`);
     const sessionId = req.cookies['auth.session']?.split(':')[1].split('.')[0];
     let sessionID = session.id;
@@ -123,7 +135,14 @@ export class AuthController {
       sessionID = sessionId;
     }
 
-    const tokens = await this.authAplicationService.exchangeCodeForToken(code.code, code.codeVerifier, code.typeDevice, sessionID);
+    const command: authorizationCommand = {
+      code: code.code,
+      codeVerifier: code.codeVerifier,
+      typeDevice: code.typeDevice,
+      sessionId: sessionID
+    };
+
+    const tokens = await this.authAplicationService.exchangeCodeForToken(command);
 
     if (!tokens) {
       this.logger.error('Error: exchangeCodeForToken retornó null/undefined');
@@ -199,28 +218,42 @@ export class AuthController {
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
+
+    const command: RequestPasswordResetCommand = {
+      correo: dto.correo,
+      ip: ip,
+      userAgent: userAgent
+    }
+
     return this.authAplicationService.requestPasswordReset(
-      dto.correo,
-      ip,
-      userAgent,
+      command
     );
   }
 
   @Get('password-reset/validate')
   @Public()
   async validateToken(@Query() dto: ValidateResetTokenDto) {
-    return this.authAplicationService.validateResetToken(dto.token, dto.uuid);
+
+    const command: validateResetTokenCommand = {
+      token: dto.token,
+      uuid: dto.uuid
+    }
+
+    return this.authAplicationService.validateResetToken(command);
   }
 
   @Post('password-reset/reset')
   @Public()
   async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authAplicationService.resetPassword(
-      dto.token,
-      dto.uuid,
-      dto.newPassword,
-      dto.confirmPassword,
-    );
+
+    const command: ResetPasswordCommand = {
+      token: dto.token,
+      uuid: dto.uuid,
+      newPassword: dto.newPassword,
+      confirmPassword: dto.confirmPassword
+    }
+
+    return this.authAplicationService.resetPassword(command);
   }
 
 }

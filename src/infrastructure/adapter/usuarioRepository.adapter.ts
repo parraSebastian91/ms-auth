@@ -3,6 +3,7 @@ import { UsuarioEntity } from "../database/entities/usuario.entity";
 import { Repository } from "typeorm";
 import { IUsuarioRepository } from "../../core/domain/puertos/outbound/iUsuarioRepository.interface";
 import { Injectable } from "@nestjs/common";
+import { UsuarioModel } from "src/core/domain/model/usuario.model";
 
 @Injectable()
 export class UsuarioRepositoryAdapter implements IUsuarioRepository {
@@ -14,12 +15,17 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         return this.usuarioRepository.count().then(count => count + 1);
     }
 
-    getAllUsuarios(): Promise<UsuarioEntity[]> {
-        return this.usuarioRepository.find({
+    getAllUsuarios(): Promise<UsuarioModel[]> {
+        const usuariosEntity = this.usuarioRepository.find({
             relations: ['rol', 'contacto', 'contacto.tipoContacto'],
         });
+        return usuariosEntity.then(usuarios => usuarios.map((usuario: UsuarioEntity) => {
+            const usuarioModel: UsuarioModel = UsuarioModel.create(usuario);
+            return usuarioModel;
+        }));
     }
-    getUsuarioById(id: number): Promise<UsuarioEntity> {
+    
+    getUsuarioById(id: number): Promise<UsuarioModel> {
         return this.usuarioRepository
             .createQueryBuilder('usuario')
             .leftJoinAndSelect('usuario.rol', 'rol')
@@ -27,10 +33,10 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
             .leftJoinAndSelect('contacto.tipoContacto', 'tipoContacto')
             .leftJoinAndSelect('rol.permisos', 'permisos', 'permisos.activo = :activo', { activo: true })
             .where('usuario.id = :id', { id })
-            .getOne();
+            .getOne().then(usuario => UsuarioModel.create(usuario));
     }
 
-    async getUsuarioByUsername(username: string): Promise<UsuarioEntity> {
+    async getUsuarioByUsername(username: string): Promise<UsuarioModel> {
         const usuario = await this.usuarioRepository
             .createQueryBuilder('usuario')
             .leftJoinAndSelect('usuario.rol', 'rol')
@@ -39,7 +45,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
             .leftJoinAndSelect('rol.permisos', 'permisos', 'permisos.activo = :activo', { activo: true })
             .where('usuario.userName = :username', { username })
             .getOne();
-        return usuario;
+        return usuario ? UsuarioModel.create(usuario) : null;
     }
 
     async getSystemsByUsername(username: string) {
@@ -65,12 +71,12 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         return sistemasUnicos;
     }
 
-    createUsuario(data: UsuarioEntity): Promise<UsuarioEntity> {
-        const newUsuario = this.usuarioRepository.create(data);
-        return this.usuarioRepository.save(newUsuario);
+    createUsuario(data: UsuarioModel): Promise<UsuarioModel> {
+        const newUsuario = this.usuarioRepository.create(UsuarioModel.toEntity(data));
+        return this.usuarioRepository.save(newUsuario).then(savedUsuario => UsuarioModel.create(savedUsuario));
     }
-    updateUsuario(id: number, data: UsuarioEntity): Promise<UsuarioEntity> {
-        return this.usuarioRepository.save({ ...data, id });
+    updateUsuario(id: number, data: UsuarioModel): Promise<UsuarioModel> {
+        return this.usuarioRepository.save({ ...UsuarioModel.toEntity(data), id }).then(savedUsuario => UsuarioModel.create(savedUsuario));
     }
     deleteUsuario(id: number): Promise<void> {
         return this.usuarioRepository.delete(id).then(() => { });

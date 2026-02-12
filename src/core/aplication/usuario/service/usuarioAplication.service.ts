@@ -11,25 +11,5 @@ export class UsuarioAplicationService implements IUsuarioAplication {
     async findById(id: string): Promise<UsuarioModel | null> {
         return this.usuarioService.getUsuarioById(id);
     }
-    
-    async findAll(): Promise<UsuarioModel[] | null> {
-        return this.usuarioService.getAllUsuarios();
-    }
-
-    async create(data: UsuarioDTO): Promise<UsuarioModel> {
-        return this.usuarioService.createUsuario(data);
-    }
-
-    async update(id: string, data: UsuarioModel): Promise<UsuarioModel> {
-        return this.usuarioService.updateUsuario(id, data);
-    }
-
-    async delete(id: string): Promise<void> {
-        return this.usuarioService.deleteUsuario(id);
-    }
-
-    async findByUsername(username: string): Promise<UsuarioModel | null> {
-        return this.usuarioService.getUsuarioByUsername(username);
-    }
 
 }
