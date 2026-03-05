@@ -24,7 +24,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
             return usuarioModel;
         }));
     }
-    
+
     getUsuarioById(id: number): Promise<UsuarioModel> {
         return this.usuarioRepository
             .createQueryBuilder('usuario')
@@ -75,9 +75,22 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         const newUsuario = this.usuarioRepository.create(UsuarioModel.toEntity(data));
         return this.usuarioRepository.save(newUsuario).then(savedUsuario => UsuarioModel.create(savedUsuario));
     }
+
     updateUsuario(id: number, data: UsuarioModel): Promise<UsuarioModel> {
-        return this.usuarioRepository.save({ ...UsuarioModel.toEntity(data), id }).then(savedUsuario => UsuarioModel.create(savedUsuario));
+        return this.usuarioRepository.save({ ...UsuarioModel.toEntity(data), id })
+            .then(savedUsuario => UsuarioModel.create(savedUsuario))
+            .catch(() => {throw new Error('Error updating usuario');});
     }
+
+    async updatePassword(id: number, passwordHash: string): Promise<void> {
+        await this.usuarioRepository
+            .createQueryBuilder()
+            .update()
+            .set({ password: passwordHash })
+            .where('id = :id', { id })
+            .execute();
+    }
+
     deleteUsuario(id: number): Promise<void> {
         return this.usuarioRepository.delete(id).then(() => { });
     }

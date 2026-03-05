@@ -10,6 +10,8 @@ import { UsuarioModel } from "./usuario.model";
 import { UsuarioEntity } from "src/infrastructure/database/entities/usuario.entity";
 import { OrganizacionModel } from "./organizacion.entity";
 import { OrganizacionEntity } from "src/infrastructure/database/entities/organizacion.entity";
+import { json } from "stream/consumers";
+import { commandUpdateUserProfile } from "src/core/aplication/auth/command/updateProfile.command";
 
 export class ContactoModel extends Entity<ContactoModel> {
 
@@ -19,7 +21,7 @@ export class ContactoModel extends Entity<ContactoModel> {
     correo: Correo;
     rrss: string;
     url: string;
-    imgBase64: string;
+    avatarData: string;
     tipoContacto: TipoContactoModel;
     usuario: UsuarioModel;
     organizaciones: OrganizacionModel[];
@@ -33,7 +35,7 @@ export class ContactoModel extends Entity<ContactoModel> {
     }
     
     static create(contacto: ContactoEntity): ContactoModel {
-        const { id, nombre, direccion, celular, correo, rrss, url, imgBase64, tipoContacto, organizaciones } = contacto;
+        const { id, nombre, direccion, celular, correo, rrss, url, avatarData, tipoContacto, organizaciones } = contacto;
         const tipoContactoEntity = tipoContacto ? TipoContactoModel.create(tipoContacto) : null;
         const celularValueObject = new Celular(celular);
         return new ContactoModel.ContactoBuilder()
@@ -44,14 +46,15 @@ export class ContactoModel extends Entity<ContactoModel> {
             .correo(new Correo(correo))
             .rrss(rrss)
             .url(url)
-            .imgBase64(imgBase64)
+            .avatarData(JSON.stringify(avatarData))
             .tipoContacto(tipoContactoEntity)
             .organizaciones(organizaciones)
             .build();
     }
-    
+
+
     static toEntity(contactoModel: ContactoModel): ContactoEntity {
-        const { id, nombre, direccion, celular, correo, rrss, url, imgBase64, tipoContacto,usuario, organizaciones} = contactoModel;
+        const { id, nombre, direccion, celular, correo, rrss, url, avatarData, tipoContacto,usuario, organizaciones} = contactoModel;
         const contactoEntity: ContactoEntity = {
             id: Number(id.getValue()),
             nombre,
@@ -60,7 +63,7 @@ export class ContactoModel extends Entity<ContactoModel> {
             correo: correo.getValue(),
             rrss,
             url,
-            imgBase64,
+            avatarData: JSON.parse(avatarData),
             tipoContacto: tipoContacto ? TipoContactoModel.toEntity(tipoContacto) : null,
             usuario: usuario ? UsuarioModel.toEntity(usuario): null,
             organizaciones: organizaciones? organizaciones.map(o => OrganizacionModel.toEntity(o)): null
@@ -108,8 +111,8 @@ export class ContactoModel extends Entity<ContactoModel> {
             return this;
         }
 
-        imgBase64(imgBase64: string) {
-            this.contacto.imgBase64 = imgBase64;
+        avatarData(avatarData: string) {
+            this.contacto.avatarData = avatarData;
             return this;
         }
 
@@ -120,6 +123,19 @@ export class ContactoModel extends Entity<ContactoModel> {
 
         organizaciones(organizaciones: OrganizacionEntity[]){
             this.contacto.organizaciones = organizaciones? organizaciones.map(o => OrganizacionModel.create(o)): null;
+            return this;
+        }
+
+        updateProfile(command: commandUpdateUserProfile, contacto: ContactoModel) {
+            this.contacto.nombre = command.nombre;
+            this.contacto.direccion = command.direccion;
+            this.contacto.celular = new Celular(command.celular);
+            this.contacto.correo = new Correo(command.correo);
+            this.contacto.rrss = command.rrss;
+            this.contacto.url = command.url;
+            this.contacto.tipoContacto = contacto.tipoContacto;
+            this.contacto.usuario = contacto.usuario;
+            this.contacto.organizaciones = contacto.organizaciones;
             return this;
         }
 

@@ -19,6 +19,7 @@ export class UsuarioModel extends Entity<UsuarioModel> {
     update: Date;
     contacto: ContactoModel;
     rol: RolModel[];
+    refreshSessions: any[]; // Puedes definir un modelo específico para RefreshSession si lo deseas
 
     constructor() {
         super();
@@ -56,7 +57,7 @@ export class UsuarioModel extends Entity<UsuarioModel> {
             creacion,
             activo,
             update,
-            refreshSessions: [],
+            refreshSessions: null, // Aquí puedes mapear refreshSessions si es necesario
             contacto: ContactoModel.toEntity(contacto),
             rol: rol.map(r => RolModel.toEntity(r)),
         };;

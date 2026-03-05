@@ -18,7 +18,7 @@ interface bodyRefresh {
   typeDevice: string;
 }
 
-@Controller('auth')
+@Controller('security')
 @UseFilters(CoreExceptionFilter)
 // Todas las rutas de auth son públicas
 export class AuthController {

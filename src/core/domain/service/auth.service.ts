@@ -248,7 +248,7 @@ export class AuthService implements IAuthService {
         if (!usuarioDB) {
             throw new UserNotFoundError("Usuario no encontrado");
         }
-        const usuario = UsuarioModel.create(usuarioDB);
+        const usuario = usuarioDB;
         if (!await bcrypt.compare(password, usuario.password)) {
             throw new LoginError("Usuario no encontrado o contraseña incorrecta");
         }
@@ -474,7 +474,7 @@ export class AuthService implements IAuthService {
         if (newPassword !== confirmPassword) {
             throw new BadRequestException('Las contraseñas no coinciden');
         }
-
+        
         // Validar token
         const resetToken = await this.passwordResetRepo.findValidToken(uuid);
         if (!resetToken) {
@@ -483,6 +483,8 @@ export class AuthService implements IAuthService {
 
         const ok = await bcrypt.compare(token, resetToken.tokenHash);
         if (!ok) {
+            console.log('🔐 Reset Password - Token no encontrado o expirado');
+
             throw new BadRequestException('Token inválido o expirado');
         }
 
@@ -490,15 +492,14 @@ export class AuthService implements IAuthService {
         const passwordHash = await bcrypt.hash(newPassword, 10);
 
         const usuario = await this.usuarioRepository.getUsuarioById(resetToken.userId);
-
+        
         if (!usuario) {
+            console.log('🔐 Reset Password - Usuario no encontrado');
             throw new BadRequestException('Usuario no encontrado');
         }
 
-        usuario.password = passwordHash;
-
-        // Actualizar contraseña del usuario
-        await this.usuarioRepository.updateUsuario(resetToken.userId, usuario);
+        // Actualizar solo el password sin afectar las relaciones
+        await this.usuarioRepository.updatePassword(resetToken.userId, passwordHash);
 
         // Marcar token como usado
         await this.passwordResetRepo.markTokenAsUsed(resetToken.id);
@@ -507,7 +508,7 @@ export class AuthService implements IAuthService {
         // await this.emailService.sendPasswordChangedConfirmation(resetToken.email);
 
         // Invalidar todas las sesiones del usuario (opcional pero recomendado)
-        await this.refreshSessionRepo.revokeAllUserSessions(usuario.id.toString());
+        await this.refreshSessionRepo.revokeAllUserSessions(usuario.id.getValue().toString());
 
         return {
             message: 'Contraseña restablecida exitosamente',
