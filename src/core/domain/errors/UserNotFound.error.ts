@@ -1,4 +1,4 @@
-class UserNotFoundError extends Error {
+export class UserNotFoundError extends Error {
     __proto__ = Error;
 
     constructor(message: string) {

@@ -18,13 +18,13 @@ export class UsuarioEntity {
     @Column({ type: "character varying", name: 'password_hash' })
     password: string;
 
-    @Column({ type: "date", name: 'fecha_creacion' })
+    @Column({ type: "date", name: 'created_at' })
     creacion: Date;
 
     @Column({ type: "boolean", name: 'activo', default: true })
     activo: boolean;
 
-    @Column({ type: "date", name: 'fecha_actualizacion', nullable: true })
+    @Column({ type: "date", name: 'updated_at', nullable: true })
     update: Date;
 
     // Relación inversa

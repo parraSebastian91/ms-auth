@@ -17,6 +17,9 @@ import { AuthenticationCommand } from "./command/AuthCommand.interface";
 import { sessionHandler } from "../../model/application.model";
 import { ConfigService } from "@nestjs/config";
 import { AccessTokenPayload } from "src/core/domain/model/jwt.model";
+import { UserNotFoundError } from "src/core/domain/errors/UserNotFound.error";
+import { LoginError } from "src/core/domain/errors/LoginError.error";
+import { InvalidcodeToken } from "src/core/domain/errors/InvalidCodeToken.error";
 
 const COOKIES = {
     REFRESH: 'auth.refresh',

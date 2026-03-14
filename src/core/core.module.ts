@@ -27,14 +27,13 @@ export type CoreModuleOptions = {
     }
 }
 
-// Application service reference
-export const USUARIO_APPLICATION = 'USUARIO_APPLICATION';
-export const AUTH_APLICATION = 'AUTH_APLICATION'
+// Application USE CASE reference
+export const AUTH_USE_CASE = 'AUTH_USE_CASE';
 
-// Domain services references
+// Application services reference
+export const AUTH_APPLICATION_SERVICE = 'AUTH_APPLICATION_SERVICE'
 
-export const USUARIO_SERVICE = 'USUARIO_SERVICE';
-export const AUTH_SERVICE = 'AUTH_SERVICE'
+// Domain services references;
 
 
 
@@ -62,7 +61,7 @@ export class CoreModule {
             provide: JwtService,
             useFactory(configService: ConfigService) {
                 return new JwtService({
-                    secret: configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET,
+                    secret: configService.get<string>('JWT_SECRET'),
                 });
             },
             inject: [ConfigService],
@@ -70,8 +69,8 @@ export class CoreModule {
 
         // Auth Service Provider
 
-        const authAplicationProvider = {
-            provide: AUTH_APLICATION,
+        const authAplicationServiceProvider = {
+            provide: AUTH_APPLICATION_SERVICE,
             useFactory(
                 cacheRepository: CacheRepositoryAdapter,
                 refreshSessionRepo: IRefreshSessionRepository,
@@ -88,14 +87,24 @@ export class CoreModule {
             inject: [CacheRepositoryAdapter, refreshSessionRepository, JwtService, ConfigService],
         };
 
-        const authServiceProvider = {
-            provide: AUTH_SERVICE,
+        const authUseCaseProvider = {
+            provide: AUTH_USE_CASE,
+            inject: [
+                usuarioRepository,
+                contactoRepository,
+                passwordResetRepository,
+                refreshSessionRepository,
+                AUTH_APPLICATION_SERVICE,
+                JwtService,
+                CacheRepositoryAdapter,
+                ConfigService,
+            ],
             useFactory(
                 authRepository: IUsuarioRepository,
                 contactoRepository: IContactoRepository,
                 passwordResetRepository: IPasswordResetRepository,
                 refreshSessionRepo: IRefreshSessionRepository,
-                authAplicationService: AuthAplicationService,
+                authService: AuthAplicationService,
                 jwtService: JwtService,
                 cacheRepository: CacheRepositoryAdapter,
                 configService: ConfigService,
@@ -105,34 +114,13 @@ export class CoreModule {
                     contactoRepository,
                     passwordResetRepository,
                     refreshSessionRepo,
-                    authAplicationService,
+                    authService,
                     jwtService,
                     cacheRepository,
                     configService,
                 );
             },
-            inject: [
-                usuarioRepository,
-                contactoRepository,
-                passwordResetRepository,
-                refreshSessionRepository,
-                AUTH_APLICATION,
-                JwtService,
-                CacheRepositoryAdapter,
-                ConfigService,
-            ],
-        };
 
-        const usuarioAplicationProvider = {
-            provide: USUARIO_APPLICATION,
-            useFactory(usuarioRepo: IUsuarioRepository) {
-                return {
-                    findById(id: number) {
-                        return usuarioRepo.getUsuarioById(id);
-                    },
-                };
-            },
-            inject: [usuarioRepository],
         };
 
         return {
@@ -144,14 +132,13 @@ export class CoreModule {
             providers: [
                 cacheRepositoryProvider,
                 jwtServiceProvider,
-                usuarioAplicationProvider,
-                authAplicationProvider,
-                authServiceProvider,
+                // usuarioAplicationProvider,
+                authAplicationServiceProvider,
+                authUseCaseProvider,
             ],
             exports: [
-                USUARIO_APPLICATION,
-                AUTH_APLICATION,
-                AUTH_SERVICE,
+                // USUARIO_APPLICATION,
+                AUTH_USE_CASE,
             ],
         };
     }

@@ -33,26 +33,53 @@ export class ContactoEntity {
     @PrimaryGeneratedColumn({ name: 'contacto_id' })
     id: number;
 
-    @Column({ type: 'varchar', length: 50, name: 'nombre' })
-    nombre: string;
+    @Column({ type: 'varchar', length: 80, name: 'nombres' })
+    nombres: string;
 
-    @Column({ type: 'varchar', length: 50, name: 'direccion' })
+    @Column({ type: 'varchar', length: 80, name: 'apellido_paterno' })
+    apellidoPaterno: string;
+
+    @Column({ type: 'varchar', length: 80, name: 'apellido_materno' })
+    apellidoMaterno: string;
+
+    @Column({ type: 'varchar', name: 'direccion' })
     direccion: string;
 
-    @Column({ type: 'varchar', length: 50, name: 'celular' })
+    @Column({ type: 'varchar', length: 20, name: 'celular' })
     celular: string;
 
-    @Column({ type: 'varchar', length: 50, name: 'correo' })
+    @Column({ type: 'varchar', length: 255, name: 'correo', unique: true })
     correo: string;
 
-    @Column({ type: 'text', name: 'redes_sociales' })
+    @Column({ type: 'varchar', length: 20, name: 'tipo_documento' })
+    tipoDocumento: string;
+
+    @Column({ type: 'varchar', length: 30, name: 'numero_documento' })
+    numeroDocumento: string;
+
+    @Column({ type: 'char', length: 2, name: 'pais_emision', default: 'CL' })
+    paisEmision: string;
+
+    @Column({ type: 'date', name: 'fecha_nacimiento' })
+    fechaNacimiento: Date;
+
+    @Column({ type: 'jsonb', name: 'redes_sociales' })
     rrss: string;
 
-    @Column({ type: 'text', name: 'url' })
-    url: string;
+    @Column({ type: 'jsonb', name: 'logo_metadata' })
+    logoMetadata: string;
 
-    @Column({ type: "jsonb", name: 'avatar_data', nullable: true }) 
-    avatarData: AvatarData | null;
+    @Column({ type: 'date', name: 'created_at' })
+    createdAt: Date;
+
+    @Column({ type: 'date', name: 'updated_at', nullable: true })
+    updatedAt: Date;
+
+    @Column({ type: 'date', name: 'eliminado_at', nullable: true })
+    eliminadoAt: Date;
+
+    @Column({ type: 'boolean', name: 'activo', default: true })
+    activo: boolean;
 
     @OneToOne(() => UsuarioEntity, usuario => usuario.contacto)
     usuario: UsuarioEntity;

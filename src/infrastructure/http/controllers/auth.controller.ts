@@ -3,7 +3,7 @@ https://docs.nestjs.com/controllers#controllers
 */
 
 import { Body, Controller, Get, Inject, Post, Res, HttpStatus as NestHttpStatus, UseFilters, Session, Logger, Req, Headers, Ip, HttpCode, Query, All } from '@nestjs/common';
-import { AUTH_APLICATION } from 'src/core/core.module';
+import { AUTH_USE_CASE } from 'src/core/core.module';
 import { CallBackDTO, LoginDto } from '../model/dto/login.dto';
 import { ApiResponse } from '../model/api-response.model';
 import { Request, Response } from 'express';
@@ -23,7 +23,7 @@ interface bodyRefresh {
 export class AuthController {
 
   constructor(@
-    Inject(AUTH_APLICATION) private readonly authAplicationService: IAuthUseCase
+    Inject(AUTH_USE_CASE) private readonly authUseCase: IAuthUseCase
   ) { }
   private readonly logger = new Logger(AuthController.name);
 
@@ -61,7 +61,7 @@ export class AuthController {
       typeDevice: body.typeDevice
     };
 
-    const tokens = await this.authAplicationService.ExecuteRefreshSession(command);
+    const tokens = await this.authUseCase.ExecuteRefreshSession(command);
 
     if (!tokens) {
       this.logger.error('Refresh token inválido o expirado');
@@ -111,7 +111,7 @@ export class AuthController {
       code_challenge: loginDto.code_challenge,
       sessionId: loginDto.sessionId
     };
-    const result = await this.authAplicationService.ExcuteAuthentication(command);
+    const result = await this.authUseCase.ExcuteAuthentication(command);
     if (!result) {
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
     }
@@ -140,8 +140,8 @@ export class AuthController {
       typeDevice: code.typeDevice,
       sessionId: sessionID
     };
-
-    const tokens = await this.authAplicationService.ExecuteAuthorization(command);
+    console.log('Command callback:', command);
+    const tokens = await this.authUseCase.ExecuteAuthorization(command);
 
     if (!tokens) {
       this.logger.error('Error: ExecuteAuthorization retornó null/undefined');
@@ -181,7 +181,7 @@ export class AuthController {
     @Res() res: Response
   ) {
     this.logger.log('Iniciando logout para la sesión:', session.id);
-    await this.authAplicationService.ExecuteLogout(session.id)
+    await this.authUseCase.ExecuteLogout(session.id)
     session.accessToken = null;
     session.refreshToken = null;
     session.destroy((err: any) => {
@@ -224,7 +224,7 @@ export class AuthController {
       userAgent: userAgent
     }
 
-    return this.authAplicationService.ExecuteRequestPasswordRequest(
+    return this.authUseCase.ExecuteRequestPasswordRequest(
       command
     );
   }
@@ -238,7 +238,7 @@ export class AuthController {
       uuid: dto.uuid
     }
 
-    return this.authAplicationService.ExecuteRequestPasswordValidation(command);
+    return this.authUseCase.ExecuteRequestPasswordValidation(command);
   }
 
   @Post('password-reset/reset')
@@ -252,7 +252,7 @@ export class AuthController {
       confirmPassword: dto.confirmPassword
     }
 
-    return this.authAplicationService.ExecuteResetPassword(command);
+    return this.authUseCase.ExecuteResetPassword(command);
   }
 
 }

@@ -6,6 +6,9 @@ import { EntityNotFoundError } from "../../core/domain/errors/usuarioNotFound.er
 import { QueryFailedError, TypeORMError } from "typeorm";
 import { UserExistError } from "src/core/domain/errors/usuarioExistError.error";
 import { ValidationError } from "src/core/domain/errors/validation.error";
+import { UserNotFoundError } from "src/core/domain/errors/UserNotFound.error";
+import { InvalidcodeToken } from "src/core/domain/errors/InvalidCodeToken.error";
+import { LoginError } from "src/core/domain/errors/LoginError.error";
 
 @Catch()
 export class CoreExceptionFilter implements ExceptionFilter {
@@ -71,7 +74,7 @@ export class CoreExceptionFilter implements ExceptionFilter {
             message = exception.message;
         }
         else if (exception instanceof LoginError) {
-            Logger.warn(`Error: ${exception.message}`, exception.stack);
+            Logger.warn(`Login Error: ${exception.message}`, exception.stack);
             status = HttpStatus.BAD_REQUEST;
             message = exception.message;
         }
