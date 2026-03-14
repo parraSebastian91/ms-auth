@@ -1,5 +1,5 @@
-import { DomainException } from "./errors/DomainException"
-import { EntityBuildError } from "./errors/EntityBuild.error"
+import { DomainException } from "../domain/errors/DomainException"
+import { EntityBuildError } from "../domain/errors/EntityBuild.error"
 
 
 export abstract class ValueObject<T> {

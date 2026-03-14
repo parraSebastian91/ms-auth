@@ -1,136 +1,57 @@
-import { UsuarioEntity } from "src/infrastructure/database/entities/usuario.entity";
-import { ContactoModel } from "./contacto.model";
-import { RolModel } from "./rol.model";
-import { Id } from "../../share/valueObject/id.valueObject";
-import { Entity } from "../../share/entity";
-import { ContactoEntity } from "src/infrastructure/database/entities/contacto.entity";
-import { RolEntity } from "src/infrastructure/database/entities/rol.entity";
-import { UsuarioDTO } from "src/infrastructure/http-server/model/dto/usuario.dto";
-import * as bcrypt from "bcrypt";
-
+import { ContactoEntity } from 'src/infrastructure/database/entities/contacto.entity';
+import { RefreshSessionEntity } from 'src/infrastructure/database/entities/RefreshSession.entity';
+import { RolEntity } from 'src/infrastructure/database/entities/rol.entity';
+import { UsuarioEntity } from 'src/infrastructure/database/entities/usuario.entity';
+import { Entity } from '../../share/entity';
+import { Id } from '../../share/valueObject/id.valueObject';
 
 export class UsuarioModel extends Entity<UsuarioModel> {
-
     uuid: string;
     userName: string;
     password: string;
     creacion: Date;
     activo: boolean;
-    update: Date;
-    contacto: ContactoModel;
-    rol: RolModel[];
-    refreshSessions: any[]; // Puedes definir un modelo específico para RefreshSession si lo deseas
+    update?: Date | null;
+    contacto?: ContactoEntity | null;
+    rol: RolEntity[];
+    refreshSessions?: RefreshSessionEntity[];
 
     constructor() {
         super();
+        this.rol = [];
     }
 
     equalsTo(entity: UsuarioModel): boolean {
-        if (!entity) return false;
-        return this.id === entity.id
+        return this.id.getValue() === entity.id.getValue();
     }
-
 
     static create(usuario: UsuarioEntity): UsuarioModel {
-        const { id, userName, password, creacion, activo, update, contacto, rol } = usuario;
-        return new this.usuarioModelBuilder()
-            .setId(Number(id))
-            .setUuid(usuario.usuarioUuid)
-            .setUserName(userName)
-            .setPassword(password)
-            .setCreacion(creacion)
-            .setActivo(activo)
-            .setUpdate(update)
-            .setContacto(contacto)
-            .setRol(rol)
-            .build();
+        const model = new UsuarioModel();
+        model.id = new Id(usuario.id);
+        model.uuid = usuario.usuarioUuid;
+        model.userName = usuario.userName;
+        model.password = usuario.password;
+        model.creacion = usuario.creacion;
+        model.activo = usuario.activo;
+        model.update = usuario.update ?? null;
+        model.contacto = usuario.contacto ?? null;
+        model.rol = usuario.rol ?? [];
+        model.refreshSessions = usuario.refreshSessions ?? [];
+        return model;
     }
 
-    static toEntity(usuarioModel: UsuarioModel): UsuarioEntity {
-        const { userName, password, creacion, activo, update, contacto, rol } = usuarioModel;
-
+    static toEntity(usuario: UsuarioModel): Partial<UsuarioEntity> {
         return {
-            id: Number(usuarioModel.id.getValue()),
-            usuarioUuid: usuarioModel.uuid,
-            userName,
-            password,
-            creacion,
-            activo,
-            update,
-            refreshSessions: null, // Aquí puedes mapear refreshSessions si es necesario
-            contacto: ContactoModel.toEntity(contacto),
-            rol: rol.map(r => RolModel.toEntity(r)),
-        };;
-    }
-
-    static fromDTO(DTO: UsuarioDTO, contacto: ContactoEntity, rol: RolEntity[]): UsuarioModel{
-        const saltRounds = 10;
-        const hashedPassword = bcrypt.hashSync(DTO.password, saltRounds);
-
-        return new this.usuarioModelBuilder()
-            .setId(null)
-            .setUuid(null)
-            .setUserName(DTO.userName)
-            .setPassword(hashedPassword)
-            .setCreacion(new Date())
-            .setActivo(true)
-            .setUpdate(new Date())
-            .setContacto(contacto)
-            .setRol(rol)
-            .build();
-    }
-
-    private static usuarioModelBuilder = class {
-
-        UsuarioModel: UsuarioModel = new UsuarioModel();
-
-        setId(id: number) {
-            this.UsuarioModel.id = new Id(id);
-            return this;
-        }
-
-        setUuid(uuid: string) {
-            this.UsuarioModel.uuid = uuid;
-            return this;
-        }
-
-        setUserName(userName: string) {
-            this.UsuarioModel.userName = userName;
-            return this;
-        }
-
-        setPassword(password: string) {
-            this.UsuarioModel.password = password;
-            return this;
-        }
-
-        setCreacion(creacion: Date) {
-            this.UsuarioModel.creacion = creacion;
-            return this;
-        }
-
-        setActivo(activo: boolean) {
-            this.UsuarioModel.activo = activo;
-            return this;
-        }
-
-        setUpdate(update: Date) {
-            this.UsuarioModel.update = update;
-            return this;
-        }
-
-        setContacto(contacto: ContactoEntity) {
-            this.UsuarioModel.contacto = contacto ? ContactoModel.create(contacto) : null;
-            return this;
-        }
-
-        setRol(rol: RolEntity[]) {
-            this.UsuarioModel.rol = rol ? rol.map(r => RolModel.create(r)) : [];
-            return this;
-        }
-
-        build() {
-            return this.UsuarioModel;
-        }
+            id: usuario.id?.getValue(),
+            usuarioUuid: usuario.uuid,
+            userName: usuario.userName,
+            password: usuario.password,
+            creacion: usuario.creacion,
+            activo: usuario.activo,
+            update: usuario.update ?? null,
+            contacto: usuario.contacto ?? null,
+            rol: usuario.rol ?? [],
+            refreshSessions: usuario.refreshSessions ?? [],
+        };
     }
 }

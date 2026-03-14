@@ -3,10 +3,6 @@ import { UsuarioEntity } from './usuario.entity'; // ajusta ruta si difiere
 
 @Entity('auth_refresh_sessions')
 export class RefreshSessionEntity {
-
-  constructor(user: UsuarioEntity) {
-    this.user = user;
-  }
   
   @PrimaryGeneratedColumn('increment')
   id: number;

@@ -4,7 +4,7 @@ https://docs.nestjs.com/modules
 
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/databaseConfig.module';
-import { HttpServerModule } from './http-server/http-server.module';
+import { HttpServerModule } from './http/http.module';
 import { UsuarioRepositoryAdapter } from './adapter/usuarioRepository.adapter';
 import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter';
 import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
@@ -24,10 +24,12 @@ import { UsuarioEntity } from './database/entities/usuario.entity';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
 import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
 import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
-import { ConfigModule as NestConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { SecretsModule } from './secrets/secrets.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
+import { CacheModule } from '@nestjs/cache-manager';
+import { RedisStore } from 'connect-redis';
 
 @Module({
     imports: [
@@ -35,6 +37,7 @@ import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepositor
         SecretsModule,
         HttpServerModule,
         MetricsModule,
+        ConfigModule,
         TypeOrmModule.forFeature([
             ContactoEntity,
             CuentaBancariaEntity,
@@ -51,6 +54,18 @@ import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepositor
             FuncionalidadEntity,
             RefreshSessionEntity
         ]),
+        CacheModule.register({
+            isGlobal: true,
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: async (configService: ConfigService) => ({
+                isGlobal: true,
+                store: RedisStore,
+                host: configService.get('redis.host') || 'localhost',
+                port: configService.get('redis.port') || '6379',
+                ttl: configService.get('redis.ttl') || '3600', // 1 hora por defecto
+            }),
+        }),
         NestConfigModule.forRoot({
             isGlobal: true,
             envFilePath: ['.env.dev', '.env'],
