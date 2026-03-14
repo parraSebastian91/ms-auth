@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { RefreshSessionModel } from "./../../domain/model/RefreshSession.model";
 import { ICacheRepository } from "./../../domain/puertos/outbound/CacheRepository.interface";
 import { IRefreshSessionRepository } from "./../../domain/puertos/outbound/iRefreshSessionRepository.interface";
@@ -36,8 +36,8 @@ export class AuthAplicationService {
         let accesTokenCache: string | null = await this.cacheRepository.getAccessToken(sessionActive.sessionId);
         let SessionObject: AccessTokenPayload = this.jwtService.decode(accesTokenCache) as AccessTokenPayload;
         //TODO: Validar que JWTService esta funcionando modularmente, posible error
-
-        if (this.jwtService.verify(accesTokenCache)) {
+            console.log(accesTokenCache);
+        if (accesTokenCache && this.jwtService.verify(accesTokenCache)) {
             this.logger.log(`session:${SessionObject.sessionId} | DB SESSION ACTIVA - | ROTACION`);
             sessionHandler = await this.rotateSession(SessionObject, meta);
         } else {
@@ -181,5 +181,10 @@ export class AuthAplicationService {
             } as AuthCodeStored
         );
         return code;
+    }
+
+    hashingCodeChallenge(codeVerifier: string): string {
+        const hash = createHash('sha256').update(codeVerifier).digest();
+        return hash.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 }
