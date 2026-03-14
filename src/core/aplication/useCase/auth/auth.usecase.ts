@@ -75,10 +75,7 @@ export class AuthUseCase implements IAuthUseCase {
         const stored = await this.cacheRepository.getAuthCode(command.code);
         if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
 
-        let hash = createHash('sha256').update(command.codeVerifier).digest();
-        const computedChallenge = hash.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-        if (computedChallenge !== stored.codeChallenge) {
+        if (this.authService.hashingCodeChallenge(command.codeVerifier) !== this.authService.hashingCodeChallenge(stored.codeChallenge)) {
             throw new InvalidcodeToken("Code verifier inválido (PKCE)");
         }
 
@@ -90,6 +87,8 @@ export class AuthUseCase implements IAuthUseCase {
         this.cacheRepository.deleteAuthCode(command.sessionId);
         return await this.authService.createRefreshSession(stored);
     }
+
+
 
     async ExecuteValidateSession(command: validateQuery): Promise<boolean> {
         const session = await this.cacheRepository.getAccessToken(command.sessionId);
