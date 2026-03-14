@@ -1,14 +1,11 @@
 import { Catch, ExceptionFilter, ArgumentsHost, Logger, HttpStatus, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { Request, Response } from "express";
-import { InsertError } from "../../core/share/errors/Insert.error";
-import { ReqValidationError } from "../../core/share/errors/reqValidation.error";
-import { EntityNotFoundError } from "../../core/share/errors/usuarioNotFound.error";
+import { InsertError } from "../../core/domain/errors/Insert.error";
+import { ReqValidationError } from "../../core/domain/errors/reqValidation.error";
+import { EntityNotFoundError } from "../../core/domain/errors/usuarioNotFound.error";
 import { QueryFailedError, TypeORMError } from "typeorm";
-import { UserExistError } from "src/core/share/errors/usuarioExistError.error";
-import { UserNotFoundError } from "src/core/share/errors/UserNotFound.error";
-import { ValidationError } from "src/core/share/errors/validation.error";
-import { InvalidcodeToken } from "src/core/share/errors/InvalidCodeToken.error";
-import { LoginError } from "src/core/share/errors/LoginError.error";
+import { UserExistError } from "src/core/domain/errors/usuarioExistError.error";
+import { ValidationError } from "src/core/domain/errors/validation.error";
 
 @Catch()
 export class CoreExceptionFilter implements ExceptionFilter {

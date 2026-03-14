@@ -7,7 +7,7 @@ interface VaultSecrets {
 
 @Injectable()
 export class VaultService implements OnModuleInit {
-  private readonly logger = new Logger(VaultService. name);
+  private readonly logger = new Logger(VaultService.name);
   private client: any;
   private secrets: Map<string, VaultSecrets> = new Map();
   private isInitialized = false;
@@ -19,7 +19,7 @@ export class VaultService implements OnModuleInit {
       this.isInitialized = true;
       this.logger.log('✅ Vault initialized and secrets loaded');
     } catch (error) {
-      this.logger. error('❌ Failed to initialize Vault', error);
+      this.logger.error('❌ Failed to initialize Vault', error);
       // En desarrollo, continuar sin Vault
       if (process.env.NODE_ENV !== 'production') {
         this.logger.warn('⚠️ Running without Vault (development mode)');
@@ -31,7 +31,7 @@ export class VaultService implements OnModuleInit {
 
   private async initializeVault() {
     const vaultAddr = process.env.VAULT_ADDR || 'http://vault:8200';
-    const vaultToken = process.env. VAULT_TOKEN || 'myroot';
+    const vaultToken = process.env.VAULT_TOKEN || 'myroot';
 
     this.logger.log(`Connecting to Vault at ${vaultAddr}`);
 
@@ -48,12 +48,12 @@ export class VaultService implements OnModuleInit {
   private async loadAllSecrets() {
     try {
       // Cargar secretos de auth-service
-      const authSecrets = await this.readSecret('auth-service');
+      const authSecrets = await this.readSecret('JWT');
       this.secrets.set('auth-service', authSecrets);
 
       // Cargar secretos de database
-      const dbSecrets = await this.readSecret('database');
-      this.secrets.set('database', dbSecrets);
+      const dbSecrets = await this.readSecret('db-seis-postgres');
+      this.secrets.set('db-seis-postgres', dbSecrets);
 
       // Cargar secretos de Redis
       const redisSecrets = await this.readSecret('redis');
@@ -65,7 +65,7 @@ export class VaultService implements OnModuleInit {
 
       this.logger.log(`Loaded ${this.secrets.size} secret paths`);
     } catch (error) {
-      this.logger. error('Failed to load secrets', error);
+      this.logger.error('Failed to load secrets', error);
       throw error;
     }
   }
@@ -73,9 +73,9 @@ export class VaultService implements OnModuleInit {
   private async readSecret(path: string): Promise<VaultSecrets> {
     try {
       const response = await this.client.read(`secret/data/${path}`);
-      return response.data. data;
+      return response.data.data;
     } catch (error) {
-      this.logger. warn(`Failed to read secret from path:  ${path}`);
+      this.logger.warn(`Failed to read secret from path:  ${path}`);
       return {};
     }
   }
@@ -86,7 +86,7 @@ export class VaultService implements OnModuleInit {
    * @param key - Clave específica (ej: 'jwt_secret', 'password')
    * @param defaultValue - Valor por defecto si no existe
    */
-  getSecret(path: string, key:  string, defaultValue?: any): any {
+  getSecret(path: string, key: string, defaultValue?: any): any {
     if (!this.isInitialized) {
       // Fallback a variables de entorno
       const envKey = key.toUpperCase();
@@ -96,7 +96,7 @@ export class VaultService implements OnModuleInit {
     const pathSecrets = this.secrets.get(path);
     if (!pathSecrets) {
       this.logger.warn(`Secret path not found: ${path}`);
-      return process.env[key. toUpperCase()] || defaultValue;
+      return process.env[key.toUpperCase()] || defaultValue;
     }
 
     return pathSecrets[key] || process.env[key.toUpperCase()] || defaultValue;

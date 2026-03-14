@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from './infrastructure/http-server/pipes/validation.pipe';
+import { ValidationPipe } from './infrastructure/http/pipes/validation.pipe';
 
 import * as session from 'express-session';
 import { createClient } from 'redis';
@@ -8,7 +8,35 @@ import { createClient } from 'redis';
 const { RedisStore } = require('connect-redis');
 const cookieParser = require('cookie-parser');
 
+import * as vault from 'node-vault';
+
+async function preloadVaultToEnv() {
+  const client = vault({
+    apiVersion: 'v1',
+    endpoint: process.env.VAULT_ADDR || 'http://vault:8200',
+    token: process.env.VAULT_TOKEN || 'myroot',
+  });
+
+  const paths = ['JWT', 'db-seis-postgres', 'redis', 'shared'];
+
+  for (const path of paths) {
+    try {
+      const res = await client.read(`secret/data/${path}`);
+      const data = res?.data?.data ?? {};
+      for (const [k, v] of Object.entries(data)) {
+        const envKey = String(k).toUpperCase();
+        if (!process.env[envKey] && v !== undefined && v !== null) {
+          process.env[envKey] = String(v);
+        }
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'production') throw e;
+    }
+  }
+}
+
 async function bootstrap() {
+  await preloadVaultToEnv();
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser()); 
@@ -36,7 +64,7 @@ async function bootstrap() {
 
   try {
     await redisClient.connect();
-    console.log(`✅ Conectado a Redis en: ${redisUrl}`);
+    console.log(`✅ Conectado a Redis para sesisones en: ${redisUrl}`);
   } catch (error) {
     console.error('❌ Error conectando a Redis:', error);
     throw error; // Detener si Redis no está disponible

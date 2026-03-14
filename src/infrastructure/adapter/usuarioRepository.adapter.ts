@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 import { IUsuarioRepository } from "../../core/domain/puertos/outbound/iUsuarioRepository.interface";
 import { Injectable } from "@nestjs/common";
 import { UsuarioModel } from "src/core/domain/model/usuario.model";
+import { UsuarioMapper } from "src/infrastructure/mapper/usuario.mapper";
 
 @Injectable()
 export class UsuarioRepositoryAdapter implements IUsuarioRepository {
@@ -19,10 +20,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
         const usuariosEntity = this.usuarioRepository.find({
             relations: ['rol', 'contacto', 'contacto.tipoContacto'],
         });
-        return usuariosEntity.then(usuarios => usuarios.map((usuario: UsuarioEntity) => {
-            const usuarioModel: UsuarioModel = UsuarioModel.create(usuario);
-            return usuarioModel;
-        }));
+        return usuariosEntity.then(usuarios => UsuarioMapper.toDomainList(usuarios));
     }
 
     getUsuarioById(id: number): Promise<UsuarioModel> {
@@ -33,7 +31,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
             .leftJoinAndSelect('contacto.tipoContacto', 'tipoContacto')
             .leftJoinAndSelect('rol.permisos', 'permisos', 'permisos.activo = :activo', { activo: true })
             .where('usuario.id = :id', { id })
-            .getOne().then(usuario => UsuarioModel.create(usuario));
+            .getOne().then(usuario => usuario ? UsuarioMapper.toDomain(usuario) : null);
     }
 
     async getUsuarioByUsername(username: string): Promise<UsuarioModel> {
@@ -45,7 +43,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
             .leftJoinAndSelect('rol.permisos', 'permisos', 'permisos.activo = :activo', { activo: true })
             .where('usuario.userName = :username', { username })
             .getOne();
-        return usuario ? UsuarioModel.create(usuario) : null;
+        return usuario ? UsuarioMapper.toDomain(usuario) : null;
     }
 
     async getSystemsByUsername(username: string) {
@@ -72,13 +70,13 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
     }
 
     createUsuario(data: UsuarioModel): Promise<UsuarioModel> {
-        const newUsuario = this.usuarioRepository.create(UsuarioModel.toEntity(data));
-        return this.usuarioRepository.save(newUsuario).then(savedUsuario => UsuarioModel.create(savedUsuario));
+        const newUsuario = this.usuarioRepository.create(UsuarioMapper.toEntity(data));
+        return this.usuarioRepository.save(newUsuario).then(savedUsuario => UsuarioMapper.toDomain(savedUsuario));
     }
 
     updateUsuario(id: number, data: UsuarioModel): Promise<UsuarioModel> {
-        return this.usuarioRepository.save({ ...UsuarioModel.toEntity(data), id })
-            .then(savedUsuario => UsuarioModel.create(savedUsuario))
+        return this.usuarioRepository.save({ ...UsuarioMapper.toEntity(data), id })
+            .then(savedUsuario => UsuarioMapper.toDomain(savedUsuario))
             .catch(() => {throw new Error('Error updating usuario');});
     }
 

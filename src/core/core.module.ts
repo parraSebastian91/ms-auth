@@ -2,24 +2,19 @@
 https://docs.nestjs.com/modules
 */
 
-import { DynamicModule, Inject, Module, Type } from '@nestjs/common';
-import { CacheModule } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { DynamicModule, Module, Type } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { AuthAplicationService } from './aplication/service/auth.service';
+import { AuthUseCase } from './aplication/useCase/auth/auth.usecase';
 import { IUsuarioRepository } from './domain/puertos/outbound/iUsuarioRepository.interface';
-import { IUsuarioService } from './domain/puertos/inbound/iUsuarioService.interface';
 import { IContactoRepository } from './domain/puertos/outbound/iContactoRepository.interface';
 import { IRolRepository } from './domain/puertos/outbound/iRolRepository.interface';
-import { IAuthService } from './domain/puertos/inbound/IAuthService.interface';
-import { AuthService } from './domain/service/auth.service';
-import { AuthAplicationService } from './aplication/auth/service/authaplication.service';
-import { TokenCacheService } from './domain/service/token-cache.service';
-import { UsuarioService } from './domain/service/Usuario.service';
-import { UsuarioAplicationService } from './aplication/usuario/service/usuarioAplication.service';
 import { IRefreshSessionRepository } from './domain/puertos/outbound/iRefreshSessionRepository.interface';
-import { BffService } from './domain/service/bff.service';
-import { HttpService } from '@nestjs/axios';
-import { IBffService } from './domain/puertos/inbound/IBffService.interface';
-import { BffAplicationService } from './aplication/bff/service/BffAplication.service';
 import { IPasswordResetRepository } from './domain/puertos/outbound/IPasswordResetRepository.interface';
+import { CacheRepositoryAdapter } from 'src/infrastructure/adapter/cacheRepository.adapter';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -35,13 +30,11 @@ export type CoreModuleOptions = {
 // Application service reference
 export const USUARIO_APPLICATION = 'USUARIO_APPLICATION';
 export const AUTH_APLICATION = 'AUTH_APLICATION'
-export const BFF_APPLICATION = 'BFF_APPLICATION';
 
 // Domain services references
 
 export const USUARIO_SERVICE = 'USUARIO_SERVICE';
 export const AUTH_SERVICE = 'AUTH_SERVICE'
-export const BFF_SERVICE = 'BFF_SERVICE';
 
 
 
@@ -50,109 +43,115 @@ export class CoreModule {
 
     static register(options: CoreModuleOptions): DynamicModule {
         const { adapters, modules } = options;
-        const { usuarioRepository, contactoRepository, rolRepository, refreshSessionRepository, passwordResetRepository } = adapters;
+        const {
+            usuarioRepository,
+            contactoRepository,
+            refreshSessionRepository,
+            passwordResetRepository,
+        } = adapters;
+
+        const cacheRepositoryProvider = {
+            provide: CacheRepositoryAdapter,
+            useFactory(cacheManager: Cache, configService: ConfigService) {
+                return new CacheRepositoryAdapter(cacheManager, configService);
+            },
+            inject: [CACHE_MANAGER, ConfigService],
+        };
+
+        const jwtServiceProvider = {
+            provide: JwtService,
+            useFactory(configService: ConfigService) {
+                return new JwtService({
+                    secret: configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET,
+                });
+            },
+            inject: [ConfigService],
+        };
 
         // Auth Service Provider
 
         const authAplicationProvider = {
             provide: AUTH_APLICATION,
-            useFactory(authService: IAuthService) {
-                return new AuthAplicationService(authService);
+            useFactory(
+                cacheRepository: CacheRepositoryAdapter,
+                refreshSessionRepo: IRefreshSessionRepository,
+                jwtService: JwtService,
+                configService: ConfigService,
+            ) {
+                return new AuthAplicationService(
+                    cacheRepository,
+                    refreshSessionRepo,
+                    jwtService,
+                    configService,
+                );
             },
-            inject: [AUTH_SERVICE]
+            inject: [CacheRepositoryAdapter, refreshSessionRepository, JwtService, ConfigService],
         };
 
         const authServiceProvider = {
             provide: AUTH_SERVICE,
             useFactory(
-                authRepository: IUsuarioRepository, 
-                tokenCacheService: TokenCacheService, 
-                refreshSessionRepository: IRefreshSessionRepository,
+                authRepository: IUsuarioRepository,
                 contactoRepository: IContactoRepository,
-                passwordResetRepository: IPasswordResetRepository
+                passwordResetRepository: IPasswordResetRepository,
+                refreshSessionRepo: IRefreshSessionRepository,
+                authAplicationService: AuthAplicationService,
+                jwtService: JwtService,
+                cacheRepository: CacheRepositoryAdapter,
+                configService: ConfigService,
             ) {
-                return new AuthService(
+                return new AuthUseCase(
                     authRepository,
-                    new (require('@nestjs/jwt').JwtService)(),
-                    tokenCacheService,
-                    refreshSessionRepository,
                     contactoRepository,
-                    passwordResetRepository
-                );
-            },
-            inject: [usuarioRepository, TokenCacheService, refreshSessionRepository, contactoRepository, passwordResetRepository]
-        };
-
-        // Usuario Service Provider
-
-        const usuarioAplicationProvider = {
-            provide: USUARIO_APPLICATION,
-            useFactory(usuarioService: IUsuarioService) {
-                return new UsuarioAplicationService(usuarioService);
-            },
-            inject: [USUARIO_SERVICE]
-        };
-
-        const usuarioServiceProvider = {
-            provide: USUARIO_SERVICE,
-            useFactory(
-                usuarioRepository: IUsuarioRepository,
-                contactoRepository: IContactoRepository,
-                rolRepository: IRolRepository
-            ) {
-                return new UsuarioService(
-                    usuarioRepository,
-                    contactoRepository,
-                    rolRepository
+                    passwordResetRepository,
+                    refreshSessionRepo,
+                    authAplicationService,
+                    jwtService,
+                    cacheRepository,
+                    configService,
                 );
             },
             inject: [
                 usuarioRepository,
                 contactoRepository,
-                rolRepository
-            ]
+                passwordResetRepository,
+                refreshSessionRepository,
+                AUTH_APLICATION,
+                JwtService,
+                CacheRepositoryAdapter,
+                ConfigService,
+            ],
         };
 
-        // BFF Service Provider
-
-        const bffAplicationProvider = {
-            provide: BFF_APPLICATION,
-            useFactory(bffService: IBffService) {
-                return new BffAplicationService(bffService);
+        const usuarioAplicationProvider = {
+            provide: USUARIO_APPLICATION,
+            useFactory(usuarioRepo: IUsuarioRepository) {
+                return {
+                    findById(id: number) {
+                        return usuarioRepo.getUsuarioById(id);
+                    },
+                };
             },
-            inject: [BFF_SERVICE]
-        }
-
-
-        const bffServiceProvider = {
-            provide: BFF_SERVICE,
-            useFactory() {
-                return new BffService(new (require('@nestjs/axios').HttpService)());
-            }
+            inject: [usuarioRepository],
         };
 
         return {
             module: CoreModule,
             global: true,
             imports: [
-                CacheModule.register(),
                 ...modules,
             ],
             providers: [
-                TokenCacheService,
+                cacheRepositoryProvider,
+                jwtServiceProvider,
                 usuarioAplicationProvider,
-                usuarioServiceProvider,
                 authAplicationProvider,
                 authServiceProvider,
-                bffAplicationProvider,
-                bffServiceProvider,
             ],
             exports: [
-                TokenCacheService,
                 USUARIO_APPLICATION,
                 AUTH_APLICATION,
                 AUTH_SERVICE,
-                BFF_APPLICATION,
             ],
         };
     }
