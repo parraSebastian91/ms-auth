@@ -9,7 +9,6 @@ import { TerminusModule } from '@nestjs/terminus';
 import { AuthController } from './controllers/auth.controller';
 import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
-import { PermissionsGuard } from './guards/permissions.guard';
 import { SecretsModule } from '../secrets/secrets.module';
 import { VaultService } from '../secrets/vault.service';
 import { HttpModule } from '@nestjs/axios';
@@ -46,17 +45,17 @@ import { LoggerInterceptor } from './middleware/logger.interceptor';
             useClass: LoggerInterceptor,
         },
         AuthGuard,
-        PermissionsGuard,
+        // PermissionsGuard,
         // Aplicar AuthGuard globalmente
         {
             provide: APP_GUARD,
             useClass: AuthGuard,
         },
         // Aplicar PermissionsGuard globalmente después del AuthGuard
-        {
-            provide: APP_GUARD,
-            useClass: PermissionsGuard,
-        },
+        // {
+        //     provide: APP_GUARD,
+        //     useClass: PermissionsGuard,
+        // },
     ],
 })
 export class HttpServerModule { }

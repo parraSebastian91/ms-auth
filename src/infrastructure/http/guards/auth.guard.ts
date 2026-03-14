@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Injec
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { AUTH_SERVICE } from '../../../core/core.module';
+import { AUTH_USE_CASE } from '../../../core/core.module';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IAuthUseCase } from 'src/core/domain/puertos/inbound/IAuthUseCase.interface';
 import { validateQuery } from 'src/core/aplication/useCase/auth/query/validate.query';
@@ -11,7 +11,7 @@ import { validateQuery } from 'src/core/aplication/useCase/auth/query/validate.q
 export class AuthGuard implements CanActivate {
   private readonly logger = new Logger(AuthGuard.name);
   constructor(
-    @Inject(AUTH_SERVICE) private authService: IAuthUseCase,
+    @Inject(AUTH_USE_CASE) private authService: IAuthUseCase,
     private reflector: Reflector,
   ) { }
 

@@ -1,4 +1,4 @@
-class InvalidcodeToken extends Error {
+export class InvalidcodeToken extends Error {
      __proto__ = Error;
 
     constructor(message: string) {

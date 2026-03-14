@@ -1,5 +1,5 @@
 
-class LoginError extends Error {
+export class LoginError extends Error {
     __proto__ = Error;
 
     constructor(message: string) {
