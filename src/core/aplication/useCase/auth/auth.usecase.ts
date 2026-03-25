@@ -50,7 +50,7 @@ export class AuthUseCase implements IAuthUseCase {
         }
         const code = await this.authService.createAuthorizationCode(
             usuario,
-            command.code_challenge,
+            this.authService.hashingCodeChallenge(command.code_challenge),
             command.typeDevice,
             command.sessionId
         );
@@ -75,16 +75,22 @@ export class AuthUseCase implements IAuthUseCase {
         const stored = await this.cacheRepository.getAuthCode(command.code);
         if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
 
-        if (this.authService.hashingCodeChallenge(command.codeVerifier) !== this.authService.hashingCodeChallenge(stored.codeChallenge)) {
+        const incomingChallenge = this.authService.hashingCodeChallenge(command.codeVerifier);
+        if (incomingChallenge!== stored.codeChallenge) {
             throw new InvalidcodeToken("Code verifier inválido (PKCE)");
         }
 
-        if (stored.typeDevice !== command.typeDevice) {
+        const storedDevice = (stored.typeDevice || '').trim().toUpperCase();
+        const commandDevice = (command.typeDevice || '').trim().toUpperCase();
+
+        if (storedDevice !== commandDevice) {
             throw new InvalidcodeToken("Tipo de dispositivo no coincide");
         }
+
         stored.sessionId = command.sessionId;
 
-        this.cacheRepository.deleteAuthCode(command.sessionId);
+        await this.cacheRepository.deleteAuthCode(command.code);
+        this.logger.log("Código de autorización eliminado de la cache");
         return await this.authService.createRefreshSession(stored);
     }
 

@@ -8,6 +8,7 @@ import { ContactoRepositoryAdapter } from './infrastructure/adapter/contactoRepo
 import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.adapter';
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
 import { PasswordResetRepositoryAdapter } from './infrastructure/adapter/passwordResetRepository.adapter';
+import { CacheRepositoryAdapter } from './infrastructure/adapter/cacheRepository.adapter';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PasswordResetRepositoryAdapter } from './infrastructure/adapter/passwor
         rolRepository: RolRepositoryAdapter,
         refreshSessionRepository: RefreshSessionRepositoryAdapter,
         passwordResetRepository: PasswordResetRepositoryAdapter,
+        cacheRepository: CacheRepositoryAdapter,
       },
     }),
   ],

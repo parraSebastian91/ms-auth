@@ -35,6 +35,7 @@ export class CacheRepositoryAdapter implements ICacheRepository {
 
     async setAccessToken(sessionId: string, token: string): Promise<void> {
         const key = this.key.session(sessionId);
+        console.log("sessionTTL: ", this.configService.get<number>('app.ttlSession'));
         await this.cacheManager.set(key, token, this.configService.get<number>('app.ttlSession'));
     }
 

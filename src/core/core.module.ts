@@ -15,6 +15,7 @@ import { IRolRepository } from './domain/puertos/outbound/iRolRepository.interfa
 import { IRefreshSessionRepository } from './domain/puertos/outbound/iRefreshSessionRepository.interface';
 import { IPasswordResetRepository } from './domain/puertos/outbound/IPasswordResetRepository.interface';
 import { CacheRepositoryAdapter } from 'src/infrastructure/adapter/cacheRepository.adapter';
+import { ICacheRepository } from './domain/puertos/outbound/CacheRepository.interface';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -24,6 +25,7 @@ export type CoreModuleOptions = {
         rolRepository: Type<IRolRepository>;
         refreshSessionRepository: Type<IRefreshSessionRepository>;
         passwordResetRepository: Type<IPasswordResetRepository>;
+        cacheRepository: Type<ICacheRepository>;
     }
 }
 
@@ -47,32 +49,15 @@ export class CoreModule {
             contactoRepository,
             refreshSessionRepository,
             passwordResetRepository,
+            cacheRepository,
         } = adapters;
-
-        const cacheRepositoryProvider = {
-            provide: CacheRepositoryAdapter,
-            useFactory(cacheManager: Cache, configService: ConfigService) {
-                return new CacheRepositoryAdapter(cacheManager, configService);
-            },
-            inject: [CACHE_MANAGER, ConfigService],
-        };
-
-        const jwtServiceProvider = {
-            provide: JwtService,
-            useFactory(configService: ConfigService) {
-                return new JwtService({
-                    secret: configService.get<string>('JWT_SECRET'),
-                });
-            },
-            inject: [ConfigService],
-        };
 
         // Auth Service Provider
 
         const authAplicationServiceProvider = {
             provide: AUTH_APPLICATION_SERVICE,
             useFactory(
-                cacheRepository: CacheRepositoryAdapter,
+                cacheRepository: ICacheRepository,
                 refreshSessionRepo: IRefreshSessionRepository,
                 jwtService: JwtService,
                 configService: ConfigService,
@@ -84,7 +69,7 @@ export class CoreModule {
                     configService,
                 );
             },
-            inject: [CacheRepositoryAdapter, refreshSessionRepository, JwtService, ConfigService],
+            inject: [cacheRepository, refreshSessionRepository, JwtService, ConfigService],
         };
 
         const authUseCaseProvider = {
@@ -96,7 +81,7 @@ export class CoreModule {
                 refreshSessionRepository,
                 AUTH_APPLICATION_SERVICE,
                 JwtService,
-                CacheRepositoryAdapter,
+                cacheRepository,
                 ConfigService,
             ],
             useFactory(
@@ -106,7 +91,7 @@ export class CoreModule {
                 refreshSessionRepo: IRefreshSessionRepository,
                 authService: AuthAplicationService,
                 jwtService: JwtService,
-                cacheRepository: CacheRepositoryAdapter,
+                cacheRepository: ICacheRepository,
                 configService: ConfigService,
             ) {
                 return new AuthUseCase(
@@ -130,9 +115,7 @@ export class CoreModule {
                 ...modules,
             ],
             providers: [
-                cacheRepositoryProvider,
-                jwtServiceProvider,
-                // usuarioAplicationProvider,
+                JwtService,
                 authAplicationServiceProvider,
                 authUseCaseProvider,
             ],

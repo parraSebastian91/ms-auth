@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { JwtService, JwtSignOptions } from "@nestjs/jwt";
+import { JwtService, JwtSignOptions, JwtVerifyOptions } from "@nestjs/jwt";
 import { createHash, randomBytes } from "crypto";
 import { RefreshSessionModel } from "./../../domain/model/RefreshSession.model";
 import { ICacheRepository } from "./../../domain/puertos/outbound/CacheRepository.interface";
@@ -7,7 +7,6 @@ import { IRefreshSessionRepository } from "./../../domain/puertos/outbound/iRefr
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from "@nestjs/config";
 import { AccessTokenPayload } from "./../../domain/model/jwt.model";
-import { Id } from "src/core/share/valueObject/id.valueObject";
 import { sessionHandler } from "../model/application.model";
 import { UsuarioModel } from "src/core/domain/model/usuario.model";
 
@@ -37,7 +36,7 @@ export class AuthAplicationService {
         let SessionObject: AccessTokenPayload = this.jwtService.decode(accesTokenCache) as AccessTokenPayload;
         //TODO: Validar que JWTService esta funcionando modularmente, posible error
             console.log(accesTokenCache);
-        if (accesTokenCache && this.jwtService.verify(accesTokenCache)) {
+        if (accesTokenCache && this.jwtService.verify(accesTokenCache,{secret: this.configService.get<string>('jwtConfig.access_secret')} as JwtVerifyOptions)) {
             this.logger.log(`session:${SessionObject.sessionId} | DB SESSION ACTIVA - | ROTACION`);
             sessionHandler = await this.rotateSession(SessionObject, meta);
         } else {
@@ -59,12 +58,12 @@ export class AuthAplicationService {
             {
                 expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET
             } as JwtSignOptions);
-        await this.cacheRepository.setAccessToken(
-            payload.sessionId,
-            accessToken
-        ).then(() => {
-            this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
-        });
+        // await this.cacheRepository.setAccessToken(
+        //     payload.sessionId,
+        //     accessToken
+        // ).then(() => {
+        //     this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
+        // });
 
         const refreshToken = this.jwtService.sign(
             { refreshToken: sessionHandler.plainToken },
@@ -115,7 +114,7 @@ export class AuthAplicationService {
 
     private async createSession(sessionActive: AuthCodeStored, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<sessionHandler> {
         this.logger.warn(`CREATE SESSION - INIT`);
-        const expiresAt = new Date(Date.now() + this.configService.get<number>('app.ttlRefreshSession') * 86400000);
+        const expiresAt = new Date(Date.now() + this.configService.get<number>('app.ttlRefreshSession'));
 
         const secret = randomBytes(48).toString('hex');
         const hash = await bcrypt.hash(secret, 10);
