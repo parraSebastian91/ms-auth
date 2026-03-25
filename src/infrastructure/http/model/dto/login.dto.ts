@@ -24,12 +24,14 @@ export class LoginDto {
 export class CallBackDTO {
   @IsNotEmpty({ message: "El código es obligatorio" })
   code: string;
-  @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
-  typeDevice: DeviceType;
-  @IsNotEmpty({ message: "El código de verificación es obligatorio" })
-  codeVerifier: string; 
-}
 
+  @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
+  @IsEnum(DeviceType, { message: "typeDevice debe ser uno de: WEB, DESKTOP, MOBILE, POSTMAN" })
+  typeDevice: DeviceType;
+
+  @IsNotEmpty({ message: "El código de verificación es obligatorio" })
+  codeVerifier: string;
+}
 
 export class RefreshDto {
   @IsNotEmpty({ message: "El token es obligatorio" })

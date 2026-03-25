@@ -2,9 +2,9 @@
 export default () => ({
   app: {
     port: parseInt(process.env.PORT, 10) || 3000,
-    ttlAuthCode: parseInt(process.env.TTL_AUTH_CODE ?? '300', 10) || 300, // 5 minutos por defecto
-    ttlSession: parseInt(process.env.TTL_SESSION ?? '3600', 10) || 3600, // 1 hora por defecto
-    ttlRefreshSession: parseInt(process.env.TTL_REFRESH_SESSION ?? '86400', 10) || 86400, // 1 día por defecto
+    ttlAuthCode: parseInt(process.env.TTL_AUTH_CODE ?? '60', 10) * 1000 || 60 * 1000, // 1 minutos por defecto
+    ttlSession: parseInt(process.env.TTL_SESSION ?? '3600', 10) * 1000 || 3600 * 1000, // 1 hora por defecto
+    ttlRefreshSession: parseInt(process.env.TTL_REFRESH_SESSION ?? '86400', 10) * 1000 || 86400 * 1000, // 1 día por defecto
   },
   database: {
     type: 'postgres',
@@ -18,7 +18,7 @@ export default () => ({
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT ?? '6379', 10) || 6379,
-    ttl: parseInt(process.env.REDIS_TTL ?? '3600', 10) || 3600, // 1 hora por defecto
+    ttl: parseInt(process.env.REDIS_TTL ?? '3600', 10) * 1000 || 3600 * 1000, // 1 hora por defecto
   },
   vault: {
     addr: process.env.VAULT_ADDR || 'http://vault:8200',

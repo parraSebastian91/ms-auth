@@ -30,6 +30,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
 import { CacheModule } from '@nestjs/cache-manager';
 import { RedisStore } from 'connect-redis';
+import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
 
 @Module({
     imports: [
@@ -76,7 +77,8 @@ import { RedisStore } from 'connect-redis';
         ContactoRepositoryAdapter,
         RolRepositoryAdapter,
         RefreshSessionRepositoryAdapter,
-        PasswordResetRepositoryAdapter
+        PasswordResetRepositoryAdapter,
+        CacheRepositoryAdapter
     ],
     exports: [
         UsuarioRepositoryAdapter,
@@ -85,7 +87,8 @@ import { RedisStore } from 'connect-redis';
         RefreshSessionRepositoryAdapter,
         SecretsModule,
         MetricsModule,
-        PasswordResetRepositoryAdapter
+        PasswordResetRepositoryAdapter,
+        CacheRepositoryAdapter
     ],
 })
 export class InfraestructureModule { }
