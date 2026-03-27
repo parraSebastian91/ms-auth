@@ -17,7 +17,7 @@ async function preloadVaultToEnv() {
     token: process.env.VAULT_TOKEN || 'myroot',
   });
 
-  const paths = ['JWT', 'db-seis-postgres', 'redis', 'shared'];
+  const paths = ['JWT', 'DB-SEIS-POSTGRES', 'REDIS', 'SHARED'];
 
   for (const path of paths) {
     try {
@@ -39,7 +39,7 @@ async function bootstrap() {
   await preloadVaultToEnv();
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
-  app.use(cookieParser()); 
+  app.use(cookieParser());
   // Deshabilitar CORS completamente
 
   const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4201';

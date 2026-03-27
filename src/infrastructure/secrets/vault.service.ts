@@ -52,12 +52,12 @@ export class VaultService implements OnModuleInit {
       this.secrets.set('auth-service', authSecrets);
 
       // Cargar secretos de database
-      const dbSecrets = await this.readSecret('db-seis-postgres');
-      this.secrets.set('db-seis-postgres', dbSecrets);
+      const dbSecrets = await this.readSecret('DB-SEIS-POSTGRES');
+      this.secrets.set('DB-SEIS-POSTGRES', dbSecrets);
 
       // Cargar secretos de Redis
-      const redisSecrets = await this.readSecret('redis');
-      this.secrets.set('redis', redisSecrets);
+      const redisSecrets = await this.readSecret('CACHE-SEIS-REDIS');
+      this.secrets.set('CACHE-SEIS-REDIS', redisSecrets);
 
       // Cargar secretos compartidos
       const sharedSecrets = await this.readSecret('shared');
