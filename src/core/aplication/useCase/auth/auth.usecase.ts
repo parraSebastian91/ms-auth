@@ -50,7 +50,8 @@ export class AuthUseCase implements IAuthUseCase {
         }
         const code = await this.authService.createAuthorizationCode(
             usuario,
-            this.authService.hashingCodeChallenge(command.code_challenge),
+            // this.authService.hashingCodeChallenge(command.code_challenge),
+            command.code_challenge,
             command.typeDevice,
             command.sessionId
         );
