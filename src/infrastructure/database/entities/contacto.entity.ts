@@ -66,9 +66,6 @@ export class ContactoEntity {
     @Column({ type: 'jsonb', name: 'redes_sociales' })
     rrss: string;
 
-    @Column({ type: 'jsonb', name: 'logo_metadata' })
-    logoMetadata: string;
-
     @Column({ type: 'date', name: 'created_at' })
     createdAt: Date;
 
