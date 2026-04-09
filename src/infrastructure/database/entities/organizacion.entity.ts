@@ -25,9 +25,6 @@ export class OrganizacionEntity {
     @Column({ type: "character varying", name: 'giro' })
     giro: string;
 
-    @Column({ type: "text", name: 'logo_base64', nullable: true })
-    logoBase64?: string;
-
     @Column({ type: "boolean", name: 'activo', default: true })
     activo: boolean;
 
