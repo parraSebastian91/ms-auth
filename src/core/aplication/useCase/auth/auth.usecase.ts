@@ -129,12 +129,24 @@ export class AuthUseCase implements IAuthUseCase {
     async ExecuteRefreshSession(command: refreshSessionCommand): Promise<{ accessToken: string, refreshToken: string } | null> {
         this.logger.log("INIT - REFRESH SESSION");
 
-        if (this.jwtService.verify(command.tokens[COOKIES.REFRESH], { secret: this.configService.get<string>('JWT_REFRESH') })) {
+        const refreshCookie = command.tokens?.[COOKIES.REFRESH];
+        if (!refreshCookie) {
+            this.logger.error('MISSING REFRESH TOKEN');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
+        }
+
+        try {
+            this.jwtService.verify(refreshCookie, { secret: this.configService.get<string>('JWT_REFRESH') });
+        } catch (_error) {
             this.logger.error('INVALID REFRESH TOKEN FORMAT');
             throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
         }
 
-        const decodedRefresh = this.jwtService.decode(command.tokens[COOKIES.REFRESH]) as { refreshToken: string } | null;
+        const decodedRefresh = this.jwtService.decode(refreshCookie) as { refreshToken: string } | null;
+        if (!decodedRefresh?.refreshToken) {
+            this.logger.error('INVALID REFRESH TOKEN PAYLOAD');
+            throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
+        }
         const [sessionId, sessionUuid, secret] = decodedRefresh.refreshToken.split('.');
 
         let sessionHandler: sessionHandler = {} as sessionHandler;
