@@ -27,22 +27,29 @@ export class AuthController {
   ) { }
   private readonly logger = new Logger(AuthController.name);
 
+  private getRequestId(req: Request): string {
+    const requestId = req.headers['x-request-id'];
+    if (Array.isArray(requestId)) return requestId[0] || ((req as any).requestId ?? 'N/A');
+    return requestId || (req as any).requestId || 'N/A';
+  }
+
   @All('session/test')
   async testSession(
     @Req() req: Request,
     @Res() res: Response
   ) {
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[SESSION_TEST] INIT requestId=${requestId}`);
     // ✅ Obtener todas las cookies
     const allCookies = req.cookies;
-    console.log('Todas las cookies:', allCookies);
 
     // ✅ Obtener cookie específica
     const refreshToken = req.cookies['auth.refresh'];
-    console.log('Refresh token:', refreshToken);
 
     // ✅ Obtener sessionId (automático de express-session)
-    const sessionId = req.cookies['auth.session'].split(':')[1]; // El ID de sesión está antes del primer punto
-    console.log('Session ID:', sessionId);
+    const sessionId = req.cookies['auth.session']?.split(':')[1]; // El ID de sesión está antes del primer punto
+    this.logger.debug(`[SESSION_TEST] requestId=${requestId} cookies=${Object.keys(allCookies || {}).length} hasRefresh=${Boolean(refreshToken)} hasSessionId=${Boolean(sessionId)}`);
+    this.logger.log(`[SESSION_TEST] SUCCESS requestId=${requestId} sessionId=${sessionId ?? 'N/A'}`);
     return res.status(200).json({ message: 'Session test successful' });
   }
 
@@ -54,17 +61,19 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response
   ) {
-    this.logger.log(`[session/refresh] - sessionId: ${session.id}`);
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[SESSION_REFRESH] INIT requestId=${requestId} sessionId=${session.id} device=${body.typeDevice}`);
 
     const command: refreshSessionCommand = {
       tokens: req.cookies,
-      typeDevice: body.typeDevice
+      typeDevice: body.typeDevice,
+      requestId
     };
 
     const tokens = await this.authUseCase.ExecuteRefreshSession(command);
 
     if (!tokens) {
-      this.logger.error('Refresh token inválido o expirado');
+      this.logger.error(`[SESSION_REFRESH] INVALID_OR_EXPIRED_REFRESH requestId=${requestId} sessionId=${session.id}`);
       return res.status(NestHttpStatus.UNAUTHORIZED).json(
         new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null)
       );
@@ -78,10 +87,10 @@ export class AuthController {
     await new Promise<void>((resolve, reject) => {
       session.save((err: any) => {
         if (err) {
-          this.logger.error('Error guardando sesión:', err);
+          this.logger.error(`[SESSION_REFRESH] SESSION_SAVE_ERROR requestId=${requestId} sessionId=${session.id}`, err?.stack);
           return reject(err);
         }
-        this.logger.log(`✅ Sesión guardada con ID: ${session.id}`);
+        this.logger.log(`[SESSION_REFRESH] SESSION_SAVED requestId=${requestId} sessionId=${session.id}`);
         resolve();
       });
     });
@@ -94,6 +103,7 @@ export class AuthController {
       path: '/'
     });
 
+    this.logger.log(`[SESSION_REFRESH] SUCCESS requestId=${requestId} sessionId=${session.id}`);
     return res.status(200).json({ message: 'Session test successful' });
   }
 
@@ -101,20 +111,25 @@ export class AuthController {
   @Public()
   async login(
     @Body() loginDto: LoginDto,
+    @Req() req: Request,
     @Res() res: Response
   ) {
-    this.logger.log(`[authenticate] - [username]:${loginDto.username} - [typeDevice]:${loginDto.typeDevice}`);
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[AUTHENTICATE] INIT requestId=${requestId} username=${loginDto.username} device=${loginDto.typeDevice} sessionId=${loginDto.sessionId}`);
     const command: AuthenticationCommand = {
       username: loginDto.username,
       password: loginDto.password,
       typeDevice: loginDto.typeDevice,
       code_challenge: loginDto.code_challenge,
-      sessionId: loginDto.sessionId
+      sessionId: loginDto.sessionId,
+      requestId
     };
     const result = await this.authUseCase.ExcuteAuthentication(command);
     if (!result) {
+      this.logger.warn(`[AUTHENTICATE] FAILED requestId=${requestId} username=${loginDto.username}`);
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
     }
+    this.logger.log(`[AUTHENTICATE] SUCCESS requestId=${requestId} username=${loginDto.username} redirects=${result.length}`);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Login exitoso', result));
   }
 
@@ -126,11 +141,12 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response
   ) {
-    this.logger.log(`INIT - [callback] - [sessionId]:${session.id}`);
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[CALLBACK] INIT requestId=${requestId} sessionId=${session.id} device=${code.typeDevice}`);
     const sessionId = req.cookies['auth.session']?.split(':')[1].split('.')[0];
     let sessionID = session.id;
     if (sessionId && (session.id !== sessionId)) {
-      this.logger.warn(`session.id (${session.id}) != sessionId (${sessionId}); REMPLAZANDO`);
+      this.logger.warn(`[CALLBACK] SESSION_ID_MISMATCH requestId=${requestId} sessionId=${session.id} cookieSessionId=${sessionId} action=replace`);
       sessionID = sessionId;
     }
 
@@ -138,13 +154,14 @@ export class AuthController {
       code: code.code,
       codeVerifier: code.codeVerifier,
       typeDevice: code.typeDevice,
-      sessionId: sessionID
+      sessionId: sessionID,
+      requestId
     };
-    console.log('Command callback:', command);
+    this.logger.debug(`[CALLBACK] COMMAND_READY requestId=${requestId} sessionId=${command.sessionId} device=${command.typeDevice}`);
     const tokens = await this.authUseCase.ExecuteAuthorization(command);
 
     if (!tokens) {
-      this.logger.error('Error: ExecuteAuthorization retornó null/undefined');
+      this.logger.error(`[CALLBACK] AUTHORIZATION_NULL requestId=${requestId} sessionId=${command.sessionId}`);
       return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Token inválido o expirado', null));
     }
 
@@ -156,10 +173,10 @@ export class AuthController {
     await new Promise<void>((resolve, reject) => {
       session.save((err: any) => {
         if (err) {
-          this.logger.error('Error guardando sesión:', err);
+          this.logger.error(`[CALLBACK] SESSION_SAVE_ERROR requestId=${requestId} sessionId=${session.id}`, err?.stack);
           return reject(err);
         }
-        this.logger.log(`✅ Sesión guardada con ID: ${session.id}`);
+        this.logger.log(`[CALLBACK] SESSION_SAVED requestId=${requestId} sessionId=${session.id}`);
         resolve();
       });
     });
@@ -171,6 +188,7 @@ export class AuthController {
       maxAge: 3600000,
     });
 
+    this.logger.log(`[CALLBACK] SUCCESS requestId=${requestId} sessionId=${session.id}`);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
   }
 
@@ -178,15 +196,17 @@ export class AuthController {
   @Public()
   async logout(
     @Session() session: Record<string, any>,
+    @Req() req: Request,
     @Res() res: Response
   ) {
-    this.logger.log('Iniciando logout para la sesión:', session.id);
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[LOGOUT] INIT requestId=${requestId} sessionId=${session.id}`);
     await this.authUseCase.ExecuteLogout(session.id)
     session.accessToken = null;
     session.refreshToken = null;
     session.destroy((err: any) => {
       if (err) {
-        this.logger.error('Error destruyendo sesión:', err);
+        this.logger.error(`[LOGOUT] SESSION_DESTROY_ERROR requestId=${requestId} sessionId=${session.id}`, err?.stack);
         return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error durante logout', null));
       }
     });
@@ -206,7 +226,7 @@ export class AuthController {
       path: '/',
     });
 
-    this.logger.log('Logout exitoso para la sesión:', session.id);
+    this.logger.log(`[LOGOUT] SUCCESS requestId=${requestId} sessionId=${session.id}`);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Logout exitoso', null));
   }
 
@@ -216,43 +236,59 @@ export class AuthController {
     @Body() dto: RequestPasswordResetDto,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
+    @Req() req: Request,
   ) {
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[PASSWORD_RESET_REQUEST] INIT requestId=${requestId} email=${dto.correo} ip=${ip}`);
 
     const command: RequestPasswordResetCommand = {
       correo: dto.correo,
       ip: ip,
-      userAgent: userAgent
+      userAgent: userAgent,
+      requestId
     }
 
-    return this.authUseCase.ExecuteRequestPasswordRequest(
+    const response = await this.authUseCase.ExecuteRequestPasswordRequest(
       command
     );
+    this.logger.log(`[PASSWORD_RESET_REQUEST] SUCCESS requestId=${requestId} email=${dto.correo}`);
+    return response;
   }
 
   @Get('password-reset/validate')
   @Public()
-  async validateToken(@Query() dto: ValidateResetTokenDto) {
+  async validateToken(@Query() dto: ValidateResetTokenDto, @Req() req: Request) {
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[PASSWORD_RESET_VALIDATE] INIT requestId=${requestId} tokenUuid=${dto.uuid}`);
 
     const command: validateResetTokenCommand = {
       token: dto.token,
-      uuid: dto.uuid
+      uuid: dto.uuid,
+      requestId
     }
 
-    return this.authUseCase.ExecuteRequestPasswordValidation(command);
+    const response = await this.authUseCase.ExecuteRequestPasswordValidation(command);
+    this.logger.log(`[PASSWORD_RESET_VALIDATE] RESULT requestId=${requestId} tokenUuid=${dto.uuid} valid=${response.valid}`);
+    return response;
   }
 
   @Post('password-reset/reset')
   @Public()
-  async resetPassword(@Body() dto: ResetPasswordDto) {
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    const requestId = this.getRequestId(req);
+    this.logger.log(`[RESET_PASSWORD] INIT requestId=${requestId} tokenUuid=${dto.uuid}`);
 
     const command: ResetPasswordCommand = {
       token: dto.token,
       uuid: dto.uuid,
       newPassword: dto.newPassword,
-      confirmPassword: dto.confirmPassword
+      confirmPassword: dto.confirmPassword,
+      requestId
     }
 
-    return this.authUseCase.ExecuteResetPassword(command);
+    const response = await this.authUseCase.ExecuteResetPassword(command);
+    this.logger.log(`[RESET_PASSWORD] SUCCESS requestId=${requestId} tokenUuid=${dto.uuid}`);
+    return response;
   }
 
 }
