@@ -5,13 +5,15 @@ export interface AuthenticationCommand {
     password: string,
     typeDevice: string,
     code_challenge: string,
-    sessionId: string
+    sessionId: string,
+    requestId?: string
 }
 
 export interface RequestPasswordResetCommand {
     correo: string;
     ip: string;
     userAgent: string;
+    requestId?: string;
 }
 
 export interface ResetPasswordCommand {
@@ -19,23 +21,27 @@ export interface ResetPasswordCommand {
     uuid: string,
     newPassword: string,
     confirmPassword: string
+    requestId?: string
 }
 
 export interface authorizationCommand {
     code: string,
     codeVerifier: string,
     typeDevice: string,
-    sessionId: string
+    sessionId: string,
+    requestId?: string
 }
 
 export interface validateResetTokenCommand {
     token: string;
     uuid?: string;
+    requestId?: string;
 }
 
 export interface refreshSessionCommand {
     tokens: Record<string, any>, 
-    typeDevice: string
+    typeDevice: string,
+    requestId?: string
 }
 
 export interface revokeUserSessionCommand {

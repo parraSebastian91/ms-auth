@@ -48,8 +48,8 @@ async function bootstrap() {
   app.enableCors({
     origin: FRONTEND_ORIGIN,
     credentials: true,
-    exposedHeaders: ['Set-Cookie'],
-    allowedHeaders: ['Content-Type', 'Origin', 'Accept', 'Authorization'],
+    exposedHeaders: ['Set-Cookie', 'x-request-id'],
+    allowedHeaders: ['Content-Type', 'Origin', 'Accept', 'Authorization', 'x-request-id'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 
   });
