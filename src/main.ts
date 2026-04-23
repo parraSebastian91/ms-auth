@@ -40,6 +40,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser());
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
   // Deshabilitar CORS completamente
 
   const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4201';
@@ -83,14 +84,13 @@ async function bootstrap() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        secure: false,
+        secure: isProd ? 'auto' : false,
         sameSite: 'lax',
         maxAge: 3600000,
         path: '/',
       },
     })
   );
-  app.getHttpAdapter().getInstance().set('trust proxy', true); // o true si está detrás de un proxy
 
   // app.use((req, res, next) => {
   //   console.log('path:', req.path);
