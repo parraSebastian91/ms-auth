@@ -6,7 +6,7 @@ import { Body, Controller, Get, Inject, Post, Res, HttpStatus as NestHttpStatus,
 import { AUTH_USE_CASE } from 'src/core/core.module';
 import { CallBackDTO, LoginDto } from '../model/dto/login.dto';
 import { ApiResponse } from '../model/api-response.model';
-import { Request, Response } from 'express';
+import { CookieOptions, Request, Response } from 'express';
 import { CoreExceptionFilter } from 'src/infrastructure/exceptionFileter/CoreException.filter';
 import { Public } from '../decorators/public.decorator';
 import { RequestPasswordResetDto, ResetPasswordDto, ValidateResetTokenDto } from '../model/dto/forgot-password.dto';
@@ -16,6 +16,8 @@ import { AuthenticationCommand, authorizationCommand, refreshSessionCommand, Req
 interface bodyRefresh {
   typeDevice: string;
 }
+
+const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Controller('security')
 @UseFilters(CoreExceptionFilter)
@@ -31,6 +33,20 @@ export class AuthController {
     const requestId = req.headers['x-request-id'];
     if (Array.isArray(requestId)) return requestId[0] || ((req as any).requestId ?? 'N/A');
     return requestId || (req as any).requestId || 'N/A';
+  }
+
+  private getRefreshCookieOptions(req: Request, maxAge: number = REFRESH_COOKIE_MAX_AGE_MS): CookieOptions {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+    const isHttps = req.secure || proto === 'https';
+
+    return {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: 'lax',
+      maxAge,
+      path: '/',
+    };
   }
 
   @All('session/test')
@@ -95,13 +111,7 @@ export class AuthController {
       });
     });
 
-    res.cookie('auth.refresh', tokens.refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días,
-      path: '/'
-    });
+    res.cookie('auth.refresh', tokens.refreshToken, this.getRefreshCookieOptions(req));
 
     this.logger.log(`[SESSION_REFRESH] SUCCESS requestId=${requestId} sessionId=${session.id}`);
     return res.status(200).json({ message: 'Session test successful' });
@@ -181,12 +191,7 @@ export class AuthController {
       });
     });
 
-    res.cookie('auth.refresh', tokens.refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      maxAge: 3600000,
-    });
+    res.cookie('auth.refresh', tokens.refreshToken, this.getRefreshCookieOptions(req));
 
     this.logger.log(`[CALLBACK] SUCCESS requestId=${requestId} sessionId=${session.id}`);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Callback exitoso', { message: 'Autenticación exitosa' }));
@@ -211,12 +216,7 @@ export class AuthController {
       }
     });
     // Eliminar cookie de refresh
-    res.clearCookie('auth.refresh', {
-      httpOnly: true,
-      secure: false,  // true en prod HTTPS
-      sameSite: 'lax', // 'none' en prod cross-site
-      path: '/',
-    });
+    res.clearCookie('auth.refresh', this.getRefreshCookieOptions(req, 0));
 
     // Eliminar cookie de sesión (express-session)
     res.clearCookie('auth.session', { // o el nombre real de tu cookie de sesión
