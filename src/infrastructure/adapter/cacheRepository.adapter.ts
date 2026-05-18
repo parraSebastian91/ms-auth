@@ -15,12 +15,13 @@ export class CacheRepositoryAdapter implements ICacheRepository {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private configService: ConfigService
     ) { }
-
+    // Guarda el codigo de uso unico al Authenticar
     async setAuthCode(code: string, authCode: AuthCodeStored): Promise<void> {
         const key = this.key.authCode(code);
         await this.cacheManager.set(key, JSON.stringify(authCode), this.configService.get<number>('app.ttlAuthCode'));
     }
 
+    // Obtiene el codigo de uso unico al autenticar
     async getAuthCode(code: string): Promise<AuthCodeStored | null> {
         const key = this.key.authCode(code);
         const data = await this.cacheManager.get<string>(key);
@@ -28,6 +29,7 @@ export class CacheRepositoryAdapter implements ICacheRepository {
         return JSON.parse(data) as AuthCodeStored;
     }
 
+    // Elimina el codigo de uso unico al autenticar
     async deleteAuthCode(code: string): Promise<void> {
         const key = this.key.authCode(code);
         await this.cacheManager.del(key);
@@ -36,7 +38,7 @@ export class CacheRepositoryAdapter implements ICacheRepository {
     async setAccessToken(sessionId: string, token: string): Promise<void> {
         const key = this.key.session(sessionId);
         console.log("sessionTTL: ", this.configService.get<number>('app.ttlSession'));
-        await this.cacheManager.set(key, token, this.configService.get<number>('app.ttlSession'));
+        await this.cacheManager.set(key, token, 0);
     }
 
     async getAccessToken(sessionId: string): Promise<string | null> {
