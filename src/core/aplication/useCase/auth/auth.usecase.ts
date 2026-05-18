@@ -86,7 +86,7 @@ export class AuthUseCase implements IAuthUseCase {
         this.logger.log(`[AUTHORIZATION] AUTH_CODE_FOUND requestId=${requestId} sessionId=${stored.sessionId} userUuid=${stored.userUuid}`);
 
         const incomingChallenge = this.authService.hashingCodeChallenge(command.codeVerifier);
-        if (incomingChallenge!== stored.codeChallenge) {
+        if (incomingChallenge !== stored.codeChallenge) {
             this.logger.warn(`[AUTHORIZATION] INVALID_PKCE requestId=${requestId} sessionId=${command.sessionId}`);
             throw new InvalidcodeToken("Code verifier inválido (PKCE)");
         }
@@ -152,7 +152,7 @@ export class AuthUseCase implements IAuthUseCase {
         }
 
         try {
-            this.jwtService.verify(refreshCookie, { secret: this.configService.get<string>('JWT_REFRESH') });
+            this.jwtService.verify(refreshCookie, { secret: this.configService.get<string>('jwtConfig.refresh_secret') });
         } catch (_error) {
             this.logger.error(`[REFRESH_SESSION] INVALID_REFRESH_TOKEN_FORMAT requestId=${requestId} device=${command.typeDevice}`);
             throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
@@ -172,11 +172,13 @@ export class AuthUseCase implements IAuthUseCase {
             throw new UnauthorizedException('Session inactiva, porfavor loguearse de nuevo');
         }
         this.logger.log(`[REFRESH_SESSION] TOKEN_PARSED requestId=${requestId} cacheSessionId=${sessionId} sessionUuid=${sessionUuid}`);
+        // ERROR: aqui ocurre el error, no encuentra el token 
         let sessionCache = await this.cacheRepository.getAccessToken(sessionId)
-
+        // retorna null de la memoria cache. con el id de session activo 
         if (!sessionCache) {
             this.logger.warn(`[REFRESH_SESSION] NO_CACHED_SESSION requestId=${requestId} cacheSessionId=${sessionId} sessionUuid=${sessionUuid}`);
         }
+
         const refreshSession = await this.refreshSessionRepo.findById(sessionUuid);
         if (!refreshSession || refreshSession.revokedAt || new Date(refreshSession.expiresAt) < new Date()) {
             this.logger.error(`[REFRESH_SESSION] SESSION_NOT_FOUND_OR_EXPIRED requestId=${requestId} sessionUuid=${sessionUuid}`);
@@ -191,7 +193,7 @@ export class AuthUseCase implements IAuthUseCase {
         }
         this.logger.log(`[REFRESH_SESSION] SESSION_VALIDATED requestId=${requestId} rotating sessionUuid=${sessionUuid}`);
         const tokenDecode = await this.jwtService.decode(sessionCache) as AccessTokenPayload;
-
+        console.log(tokenDecode);
         sessionHandler = await this.authService.rotateSession(tokenDecode, { ip: refreshSession.ip, ua: refreshSession.userAgent, fingerprint: refreshSession.deviceFingerprint });
 
         const payload: AccessTokenPayload = {
@@ -207,8 +209,10 @@ export class AuthUseCase implements IAuthUseCase {
         const accessToken = this.jwtService.sign(
             payload,
             {
-                expiresIn: (payload.permissions.includes("SUPER_ADMIN") || payload.roles.includes("ADMIN")) ? this.configService.get<string>('admin_expires_in') : this.configService.get<string>('access_expires_in'),
-                secret: this.configService.get<string>('access_secret')
+                expiresIn: (payload.permissions.includes("SUPER_ADMIN") || payload.roles.includes("ADMIN")) ?
+                    this.configService.get<string>('jwtConfig.admin_expires_in') :
+                    this.configService.get<string>('jwtConfig.access_expires_in'),
+                secret: this.configService.get<string>('jwtConfig.access_secret')
             } as JwtSignOptions);
         await this.cacheRepository.setAccessToken(
             payload.sessionId,
@@ -220,8 +224,8 @@ export class AuthUseCase implements IAuthUseCase {
         const refreshToken = this.jwtService.sign(
             { refreshToken: sessionHandler.plainToken },
             {
-                expiresIn: this.configService.get<string>('refresh_expires_in'),
-                secret: this.configService.get<string>('refresh_secret')
+                expiresIn: this.configService.get<string>('jwtConfig.refresh_expires_in'),
+                secret: this.configService.get<string>('jwtConfig.refresh_secret')
             } as JwtSignOptions
         );
         this.logger.log(`[REFRESH_SESSION] SUCCESS requestId=${requestId} userUuid=${payload.userUuid} sessionId=${payload.sessionId} sessionUuid=${payload.sessionUuid}`);

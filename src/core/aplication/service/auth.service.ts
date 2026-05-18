@@ -34,12 +34,12 @@ export class AuthAplicationService {
         let sessionHandler: sessionHandler = {} as sessionHandler;
         let accesTokenCache: string | null = await this.cacheRepository.getAccessToken(sessionActive.sessionId);
         let SessionObject: AccessTokenPayload = this.jwtService.decode(accesTokenCache) as AccessTokenPayload;
-        //TODO: Validar que JWTService esta funcionando modularmente, posible error
-            console.log(accesTokenCache);
-        if (accesTokenCache && this.jwtService.verify(accesTokenCache,{secret: this.configService.get<string>('jwtConfig.access_secret')} as JwtVerifyOptions)) {
+        // Valido si existe session en cache, si existe la sesion en un mismo dispositivo, se rota la session 
+        if (accesTokenCache && this.jwtService.verify(accesTokenCache, { secret: this.configService.get<string>('jwtConfig.access_secret') } as JwtVerifyOptions)) {
             this.logger.log(`session:${SessionObject.sessionId} | DB SESSION ACTIVA - | ROTACION`);
             sessionHandler = await this.rotateSession(SessionObject, meta);
         } else {
+            // si no existe, se crea session nueva
             this.logger.log(`session:${sessionActive.sessionId} | DB SESSION INACTIVA - | CREACION`);
             sessionHandler = await this.createSession(sessionActive, meta);
         }
@@ -53,21 +53,29 @@ export class AuthAplicationService {
             permissions: sessionActive.permisos,
             typeDevice: sessionActive.typeDevice
         }
+        const expireToken = (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ?
+            this.configService.get<string>('jwtConfig.admin_expires_in') :
+            this.configService.get<string>('jwtConfig.access_expires_in')
         const accessToken = this.jwtService.sign(
             payload,
             {
-                expiresIn: (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ? process.env.JWT_ADMIN_EXPIRES_IN : process.env.JWT_EXPIRES_IN, secret: process.env.JWT_SECRET
+                expiresIn: expireToken,
+                secret: this.configService.get<string>('jwtConfig.access_secret')
             } as JwtSignOptions);
-        // await this.cacheRepository.setAccessToken(
-        //     payload.sessionId,
-        //     accessToken
-        // ).then(() => {
-        //     this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
-        // });
+
+        await this.cacheRepository.setAccessToken(
+            payload.sessionId,
+            accessToken
+        ).then(() => {
+            this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
+        });
 
         const refreshToken = this.jwtService.sign(
             { refreshToken: sessionHandler.plainToken },
-            { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN, secret: process.env.JWT_REFRESH_SECRET } as JwtSignOptions);
+            {
+                expiresIn: this.configService.get<string>('jwtConfig.refresh_expires_in'),
+                secret: this.configService.get<string>('jwtConfig.refresh_secret')
+            } as JwtSignOptions);
 
         this.logger.log("REFRESH SESSION - OK");
         return { accessToken, refreshToken };
@@ -77,8 +85,11 @@ export class AuthAplicationService {
         this.logger.log("ROTATE SESSION - INIT");
         this.refreshSessionRepo.revokeById(SessionObject.sessionUuid);
         this.cacheRepository.deleteAccessToken(SessionObject.sessionId);
-        const expiresAt = new Date(Date.now() + this.configService.get<number>('app.ttlRefreshSession') * 86400000);
+        const date = new Date();
+        date.setMilliseconds(Date.now() + this.configService.get<number>('app.ttlRefreshSession'))
+        const expiresAt = date;
 
+        console.log(expiresAt)
         SessionObject.sessionId = SessionObject.sessionId;
         const secret = randomBytes(48).toString('hex');
         const hash = await bcrypt.hash(secret, 10);
