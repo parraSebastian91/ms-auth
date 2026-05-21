@@ -127,3 +127,70 @@ temp/
 # Application specific
 app.log
 app.pid
+
+
+# ==============================================================================
+# CODE ANALYSIS & INDEXING (Generados - se reindexan cuando sea necesario)
+# ==============================================================================
+# CodeGraph
+.codegraph/
+codegraph.json
+codegraph-*.json
+
+# Graphify
+graphify-out/
+*.graph.json
+GRAPH_REPORT.md
+
+# Reportes y análisis
+*-report.json
+dependency-report.json
+impact-analysis.json
+.analysis-cache/
+
+# ==============================================================================
+# BUILD & COMPILATION ARTIFACTS
+# ==============================================================================
+# TypeScript outputs
+tsc-out/
+*.tsbuildinfo
+
+# Angular
+.angular/
+angular-out/
+
+# Nuxt
+.nuxt/
+
+# Next.js
+.next/
+.vercel/
+
+# Gatsby
+.cache/
+.gatsby-cache/
+public/
+
+# Jest & Testing
+test-results/
+junit.xml
+coverage-final.json
+
+# ==============================================================================
+# TEMPORARY & CACHE FILES
+# ==============================================================================
+.temp/
+temp/
+tmp/
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Package manager cache
+.npm/
+.yarn/cache/
+.pnpm-store/
+pnpm-lock.yaml.backup
