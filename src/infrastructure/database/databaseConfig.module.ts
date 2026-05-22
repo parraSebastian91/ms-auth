@@ -13,31 +13,36 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             imports: [SecretsModule, ConfigModule],
             inject: [VaultService, ConfigService],
             useFactory: async (vaultService: VaultService, configService: ConfigService) => {
-                const dbSecrets = vaultService.getAllSecrets('database');
-                return {
-                    type: 'postgres',
-                    host: dbSecrets.DATABASE_HOST || configService.get('DATABASE_HOST') || 'localhost',
-                    port:   parseInt(dbSecrets.DATABASE_PORT, 10) || parseInt(configService.get('DATABASE_PORT'), 10) || 5432,
-                    username: dbSecrets.DATABASE_USER || configService.get('DATABASE_USER') || 'desarrollo',
-                    password: dbSecrets.DATABASE_PASSWORD || configService.get('DATABASE_PASSWORD') || 'desarrollo123',
-                    database: dbSecrets.DATABASE_NAME || configService.get('DATABASE_NAME') || 'core_erp',
-                    schema: dbSecrets.DATABASE_SCHEMA || configService.get('DATABASE_SCHEMA') || 'core',
+                let dbConfig: any = {
+                    type: 'postgres' as const,
+                    host: configService.get('database.host') ,
+                    port: configService.get('database.port') ,
+                    username: configService.get('database.username') ,
+                    password: configService.get('database.password') ,
+                    database: configService.get('database.database'),
+                    schema: configService.get('database.schema'),
                     entities: [__dirname + '/entities/*.entity{.ts,.js}'],
                     synchronize: false,  // ← NO usar true en producción
                     // ✅ ACTIVAR LOGGING COMPLETO
                     logging: false,  // O más específico:  ['query', 'error', 'schema', 'warn', 'info', 'log']
                     logger: 'advanced-console',  // O 'debug', 'simple-console'
-
+                    
                     // ✅ Ver todas las queries
                     maxQueryExecutionTime: 1000,
+                    // ✅ SSL
+                    ssl: true,
                     // ✅ Opciones adicionales de debugging
                     extra: {
                         // Ver detalles de conexión
                         connectionTimeoutMillis: 5000,
                         query_timeout: 10000,
                         statement_timeout: 10000,
+                        ssl: true,
                     },
                 }
+                console.log(dbConfig);
+                return dbConfig;
+
             },
         })
     ],
