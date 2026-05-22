@@ -8,12 +8,12 @@ export default () => ({
   },
   database: {
     type: 'postgres',
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
-    database: process.env.DATABASE_NAME || 'postgres',
-    schema: 'core',
-    synchronize: true,
-    secret_key: process.env.DATABASE_SECRET_KEY || 'database',
+    host: process.env.DATABASE_HOST,
+    port: parseInt(process.env.DATABASE_PORT, 10),
+    database: process.env.DATABASE_NAME,
+    username: process.env.DATABASE_USER,
+    password: process.env.DATABASE_PASSWORD,
+    schema: process.env.DATABASE_SCHEMA,
   },
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
