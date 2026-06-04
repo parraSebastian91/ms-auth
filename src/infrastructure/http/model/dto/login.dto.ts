@@ -17,8 +17,8 @@ export class LoginDto {
   @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
   @IsEnum(DeviceType, { message: "typeDevice debe ser uno de: WEB, DESKTOP, MOBILE, POSTMAN" })
   typeDevice: DeviceType;
-
-  sessionId: string;
+  @IsNotEmpty({ message: "El CorrelationId es obligatorio" })
+  CorrelationId: string;
 }
 
 export class CallBackDTO {
@@ -31,6 +31,8 @@ export class CallBackDTO {
 
   @IsNotEmpty({ message: "El código de verificación es obligatorio" })
   codeVerifier: string;
+  @IsNotEmpty({ message: "El sessionId es obligatorio" })
+  cid: string
 }
 
 export class RefreshDto {

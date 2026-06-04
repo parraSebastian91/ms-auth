@@ -1,6 +1,7 @@
 class AuthCodeStored {
     userId: number;
     userUuid: string;
+    CorrelationId: string;
     sessionId: string;
     sessionUuid: string;
     sub: string;
