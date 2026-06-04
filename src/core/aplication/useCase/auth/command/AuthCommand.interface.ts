@@ -5,7 +5,7 @@ export interface AuthenticationCommand {
     password: string,
     typeDevice: string,
     code_challenge: string,
-    sessionId: string,
+    CorrelationId: string,
     requestId?: string
 }
 
@@ -29,6 +29,7 @@ export interface authorizationCommand {
     codeVerifier: string,
     typeDevice: string,
     sessionId: string,
+    CorrelationId: string,
     requestId?: string
 }
 
@@ -39,7 +40,7 @@ export interface validateResetTokenCommand {
 }
 
 export interface refreshSessionCommand {
-    tokens: Record<string, any>, 
+    tokens: Record<string, any>,
     typeDevice: string,
     requestId?: string
 }

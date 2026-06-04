@@ -174,14 +174,14 @@ export class AuthAplicationService {
         return revokedCount;
     }
 
-    async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, sessionId: string): Promise<string> {
+    async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, CorrelationId: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
         await this.cacheRepository.setAuthCode(
             code,
             {
                 userId: usuario.id.getValue(),
                 userUuid: usuario.uuid,
-                sessionId,
+                CorrelationId,
                 sub: usuario.userName,
                 rol: usuario.rol.map(r => r.codigo) as string[],
                 permisos: usuario.rol.flatMap(r => r.permisos ? r.permisos.map(p => p.codigo) : []) as string[],

@@ -42,25 +42,25 @@ export class AuthUseCase implements IAuthUseCase {
 
     async ExcuteAuthentication(command: AuthenticationCommand): Promise<{ code: string, url: string }[] | null> {
         const requestId = command.requestId || 'N/A';
-        this.logger.log(`[AUTHENTICATE] INIT requestId=${requestId} username=${command.username} device=${command.typeDevice} sessionId=${command.sessionId}`);
+        this.logger.log(`[AUTHENTICATE] INIT requestId=${requestId} username=${command.username} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`);
         const usuario = await this.usuarioRepository.getUsuarioByUsername(command.username);
         if (!usuario) {
-            this.logger.warn(`[AUTHENTICATE] USER_NOT_FOUND requestId=${requestId} username=${command.username}`);
+            this.logger.warn(`[AUTHENTICATE] USER_NOT_FOUND requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`);
             throw new UserNotFoundError("Usuario no encontrado");
         }
         if (!await bcrypt.compare(command.password, usuario.password)) {
-            this.logger.warn(`[AUTHENTICATE] INVALID_CREDENTIALS requestId=${requestId} username=${command.username}`);
+            this.logger.warn(`[AUTHENTICATE] INVALID_CREDENTIALS requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`);
             throw new LoginError("Usuario no encontrado o contraseña incorrecta");
         }
-        this.logger.log(`[AUTHENTICATE] CREDENTIALS_VALID requestId=${requestId} userUuid=${usuario.uuid} sessionId=${command.sessionId}`);
+        this.logger.log(`[AUTHENTICATE] CREDENTIALS_VALID requestId=${requestId} userUuid=${usuario.uuid} CorrelationId=${command.CorrelationId}`);
         const code = await this.authService.createAuthorizationCode(
             usuario,
             // this.authService.hashingCodeChallenge(command.code_challenge),
             command.code_challenge,
             command.typeDevice,
-            command.sessionId
+            command.CorrelationId
         );
-        this.logger.log(`[AUTHENTICATE] AUTH_CODE_CREATED requestId=${requestId} userUuid=${usuario.uuid} sessionId=${command.sessionId}`);
+        this.logger.log(`[AUTHENTICATE] AUTH_CODE_CREATED requestId=${requestId} userUuid=${usuario.uuid} CorrelationId=${command.CorrelationId}`);
 
         const uris = await this.usuarioRepository
             .getSystemsByUsername(command.username)
@@ -68,7 +68,7 @@ export class AuthUseCase implements IAuthUseCase {
                 return data.map(item => {
                     return {
                         code: encodeURIComponent(code),
-                        url: `/validate?code=${encodeURIComponent(code)}`
+                        url: `/validate?code=${encodeURIComponent(code)}&cid=${encodeURIComponent(command.CorrelationId)}`,                        
                     }
                 });
             });
@@ -78,16 +78,16 @@ export class AuthUseCase implements IAuthUseCase {
 
     async ExecuteAuthorization(command: authorizationCommand): Promise<{ accessToken: string, refreshToken: string } | null> {
         const requestId = command.requestId || 'N/A';
-        this.logger.log(`[AUTHORIZATION] INIT requestId=${requestId} sessionId=${command.sessionId} device=${command.typeDevice}`);
+        this.logger.log(`[AUTHORIZATION] INIT requestId=${requestId} sessionId=${command.sessionId} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`);
         if (!command.code || command.code === '') throw new InvalidcodeToken("Código de autorización inválido");
 
         const stored = await this.cacheRepository.getAuthCode(command.code);
         if (!stored) throw new InvalidcodeToken("Código de autorización inválido");
-        this.logger.log(`[AUTHORIZATION] AUTH_CODE_FOUND requestId=${requestId} sessionId=${stored.sessionId} userUuid=${stored.userUuid}`);
+        this.logger.log(`[AUTHORIZATION] AUTH_CODE_FOUND requestId=${requestId} CorrelationId=${stored.CorrelationId} userUuid=${stored.userUuid} CorrelationId=${command.CorrelationId}`);
 
         const incomingChallenge = this.authService.hashingCodeChallenge(command.codeVerifier);
         if (incomingChallenge !== stored.codeChallenge) {
-            this.logger.warn(`[AUTHORIZATION] INVALID_PKCE requestId=${requestId} sessionId=${command.sessionId}`);
+            this.logger.warn(`[AUTHORIZATION] INVALID_PKCE requestId=${requestId} sessionId=${command.sessionId} CorrelationId=${command.CorrelationId}`);
             throw new InvalidcodeToken("Code verifier inválido (PKCE)");
         }
 
@@ -95,16 +95,16 @@ export class AuthUseCase implements IAuthUseCase {
         const commandDevice = (command.typeDevice || '').trim().toUpperCase();
 
         if (storedDevice !== commandDevice) {
-            this.logger.warn(`[AUTHORIZATION] DEVICE_MISMATCH requestId=${requestId} stored=${storedDevice} incoming=${commandDevice} sessionId=${command.sessionId}`);
+            this.logger.warn(`[AUTHORIZATION] DEVICE_MISMATCH requestId=${requestId} stored=${storedDevice} incoming=${commandDevice} sessionId=${command.sessionId} CorrelationId=${command.CorrelationId}`);
             throw new InvalidcodeToken("Tipo de dispositivo no coincide");
         }
 
         stored.sessionId = command.sessionId;
 
         await this.cacheRepository.deleteAuthCode(command.code);
-        this.logger.log(`[AUTHORIZATION] AUTH_CODE_DELETED requestId=${requestId} sessionId=${command.sessionId}`);
+        this.logger.log(`[AUTHORIZATION] AUTH_CODE_DELETED requestId=${requestId} sessionId=${command.sessionId} CorrelationId=${command.CorrelationId}`);
         const tokens = await this.authService.createRefreshSession(stored);
-        this.logger.log(`[AUTHORIZATION] SUCCESS requestId=${requestId} sessionId=${command.sessionId} userUuid=${stored.userUuid}`);
+        this.logger.log(`[AUTHORIZATION] SUCCESS requestId=${requestId} sessionId=${command.sessionId} userUuid=${stored.userUuid} CorrelationId=${command.CorrelationId}`);
         return tokens;
     }
 

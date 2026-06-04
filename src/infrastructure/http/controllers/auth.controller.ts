@@ -125,13 +125,14 @@ export class AuthController {
     @Res() res: Response
   ) {
     const requestId = this.getRequestId(req);
-    this.logger.log(`[AUTHENTICATE] INIT requestId=${requestId} username=${loginDto.username} device=${loginDto.typeDevice} sessionId=${loginDto.sessionId}`);
+
+    this.logger.log(`[AUTHENTICATE] INIT requestId=${requestId} username=${loginDto.username} device=${loginDto.typeDevice} CorrelationId=${loginDto.CorrelationId}`);
     const command: AuthenticationCommand = {
       username: loginDto.username,
       password: loginDto.password,
       typeDevice: loginDto.typeDevice,
       code_challenge: loginDto.code_challenge,
-      sessionId: loginDto.sessionId,
+      CorrelationId: loginDto.CorrelationId,
       requestId
     };
     const result = await this.authUseCase.ExcuteAuthentication(command);
@@ -156,7 +157,7 @@ export class AuthController {
     const sessionId = req.cookies['auth.session']?.split(':')[1].split('.')[0];
     let sessionID = session.id;
     if (sessionId && (session.id !== sessionId)) {
-      this.logger.warn(`[CALLBACK] SESSION_ID_MISMATCH requestId=${requestId} sessionId=${session.id} cookieSessionId=${sessionId} action=replace`);
+      this.logger.warn(`[CALLBACK] SESSION_ID_MISMATCH requestId=${requestId} CorrelationId=${code.cid}`);
       sessionID = sessionId;
     }
 
@@ -165,6 +166,7 @@ export class AuthController {
       codeVerifier: code.codeVerifier,
       typeDevice: code.typeDevice,
       sessionId: sessionID,
+      CorrelationId: code.cid,
       requestId
     };
     this.logger.debug(`[CALLBACK] COMMAND_READY requestId=${requestId} sessionId=${command.sessionId} device=${command.typeDevice}`);
