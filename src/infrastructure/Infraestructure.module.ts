@@ -31,6 +31,8 @@ import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepositor
 import { CacheModule } from '@nestjs/cache-manager';
 import { RedisStore } from 'connect-redis';
 import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
+import { ConsoleEmailAdapter } from './adapter/consoleEmail.adapter';
+import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.interface';
 
 @Module({
     imports: [
@@ -78,7 +80,8 @@ import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
         RolRepositoryAdapter,
         RefreshSessionRepositoryAdapter,
         PasswordResetRepositoryAdapter,
-        CacheRepositoryAdapter
+        CacheRepositoryAdapter,
+        { provide: EMAIL_SERVICE, useClass: ConsoleEmailAdapter },
     ],
     exports: [
         UsuarioRepositoryAdapter,
@@ -88,7 +91,8 @@ import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
         SecretsModule,
         MetricsModule,
         PasswordResetRepositoryAdapter,
-        CacheRepositoryAdapter
+        CacheRepositoryAdapter,
+        EMAIL_SERVICE,
     ],
 })
 export class InfraestructureModule { }

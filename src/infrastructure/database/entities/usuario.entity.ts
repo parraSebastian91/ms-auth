@@ -24,6 +24,9 @@ export class UsuarioEntity {
     @Column({ type: "boolean", name: 'activo', default: true })
     activo: boolean;
 
+    @Column({ type: "boolean", name: 'email_verificado', default: false })
+    emailVerificado: boolean;
+
     @Column({ type: "date", name: 'updated_at', nullable: true })
     update: Date;
 
