@@ -16,6 +16,8 @@ import { IRefreshSessionRepository } from './domain/puertos/outbound/iRefreshSes
 import { IPasswordResetRepository } from './domain/puertos/outbound/IPasswordResetRepository.interface';
 import { CacheRepositoryAdapter } from 'src/infrastructure/adapter/cacheRepository.adapter';
 import { ICacheRepository } from './domain/puertos/outbound/CacheRepository.interface';
+import { IEmailService, EMAIL_SERVICE } from './domain/puertos/outbound/IEmailService.interface';
+import { RegistroUseCaseImpl } from './aplication/useCase/registro/registro.usecase.impl';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -31,6 +33,7 @@ export type CoreModuleOptions = {
 
 // Application USE CASE reference
 export const AUTH_USE_CASE = 'AUTH_USE_CASE';
+export const REGISTRO_USE_CASE = 'REGISTRO_USE_CASE';
 
 // Application services reference
 export const AUTH_APPLICATION_SERVICE = 'AUTH_APPLICATION_SERVICE'
@@ -50,6 +53,7 @@ export class CoreModule {
             refreshSessionRepository,
             passwordResetRepository,
             cacheRepository,
+            rolRepository,
         } = adapters;
 
         // Auth Service Provider
@@ -70,6 +74,32 @@ export class CoreModule {
                 );
             },
             inject: [cacheRepository, refreshSessionRepository, JwtService, ConfigService],
+        };
+
+        const registroUseCaseProvider = {
+            provide: REGISTRO_USE_CASE,
+            inject: [
+                usuarioRepository,
+                contactoRepository,
+                cacheRepository,
+                EMAIL_SERVICE,
+                rolRepository,
+            ],
+            useFactory(
+                authRepository: IUsuarioRepository,
+                contactoRepository: IContactoRepository,
+                cacheRepository: ICacheRepository,
+                emailService: IEmailService,
+                rolRepository: IRolRepository,
+            ) {
+                return new RegistroUseCaseImpl(
+                    authRepository,
+                    contactoRepository,
+                    cacheRepository,
+                    emailService,
+                    rolRepository,
+                );
+            },
         };
 
         const authUseCaseProvider = {
@@ -118,9 +148,10 @@ export class CoreModule {
                 JwtService,
                 authAplicationServiceProvider,
                 authUseCaseProvider,
+                registroUseCaseProvider,
             ],
             exports: [
-                // USUARIO_APPLICATION,
+                REGISTRO_USE_CASE,
                 AUTH_USE_CASE,
             ],
         };

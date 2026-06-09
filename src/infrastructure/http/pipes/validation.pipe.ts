@@ -1,8 +1,7 @@
-import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from '@nestjs/common';
+import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { ValidationError } from 'src/core/domain/errors/validation.error';
-import e from 'express';
 
 @Injectable()
 export class ValidationPipe implements PipeTransform<any> {
@@ -13,7 +12,11 @@ export class ValidationPipe implements PipeTransform<any> {
     const object = plainToInstance(metatype, value);
     const errors = await validate(object);
     if (errors.length > 0) {
-      throw new ValidationError(errors[0].constraints.isEnum);
+      const firstError = errors[0];
+      const firstConstraint = firstError?.constraints
+        ? Object.values(firstError.constraints)[0]
+        : 'Invalid request payload';
+      throw new ValidationError(firstConstraint);
     }
     return value;
   }

@@ -13,6 +13,7 @@ import { SecretsModule } from '../secrets/secrets.module';
 import { VaultService } from '../secrets/vault.service';
 import { HttpModule } from '@nestjs/axios';
 import { LoggerInterceptor } from './middleware/logger.interceptor';
+import { RegistroController } from './controllers/registro.controller';
 
 @Module({
     imports: [
@@ -37,6 +38,7 @@ import { LoggerInterceptor } from './middleware/logger.interceptor';
     ],
     controllers: [
         AuthController,
+        RegistroController,
         HealthController
     ],
     providers: [

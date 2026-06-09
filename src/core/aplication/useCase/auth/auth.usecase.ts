@@ -20,6 +20,7 @@ import { AccessTokenPayload } from "src/core/domain/model/jwt.model";
 import { UserNotFoundError } from "src/core/domain/errors/UserNotFound.error";
 import { LoginError } from "src/core/domain/errors/LoginError.error";
 import { InvalidcodeToken } from "src/core/domain/errors/InvalidCodeToken.error";
+import { EmailNotVerifiedError } from "src/core/domain/errors/EmailNotVerified.error";
 
 const COOKIES = {
     REFRESH: 'auth.refresh',
@@ -52,8 +53,12 @@ export class AuthUseCase implements IAuthUseCase {
             this.logger.warn(`[AUTHENTICATE] INVALID_CREDENTIALS requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`);
             throw new LoginError("Usuario no encontrado o contraseña incorrecta");
         }
-        this.logger.log(`[AUTHENTICATE] CREDENTIALS_VALID requestId=${requestId} userUuid=${usuario.uuid} CorrelationId=${command.CorrelationId}`);
-        const code = await this.authService.createAuthorizationCode(
+        if (!usuario.emailVerificado) {
+            const email = usuario.contacto?.correo ?? command.username;
+            this.logger.warn(`[AUTHENTICATE] EMAIL_NOT_VERIFIED requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`);
+            throw new EmailNotVerifiedError(email);
+        }
+        this.logger.log(`[AUTHENTICATE] CREDENTIALS_VALID requestId=${requestId} userUuid=${usuario.uuid} CorrelationId=${command.CorrelationId}`);        const code = await this.authService.createAuthorizationCode(
             usuario,
             // this.authService.hashingCodeChallenge(command.code_challenge),
             command.code_challenge,

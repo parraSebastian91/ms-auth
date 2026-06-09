@@ -6,9 +6,12 @@ import { ConfigService } from "@nestjs/config";
 
 export class CacheRepositoryAdapter implements ICacheRepository {
 
+    private readonly EMAIL_VERIFY_TTL_MS = 10 * 60 * 1000; // 10 minutos
+
     key = {
-        authCode: (code: string) => `auth_code:${code}`,
-        session: (sessionId: string) => `session:${sessionId}`
+        authCode:     (code: string)     => `auth_code:${code}`,
+        session:      (sessionId: string) => `session:${sessionId}`,
+        emailVerify:  (userUuid: string)  => `email_verify:${userUuid}`,
     }
 
     constructor(
@@ -50,6 +53,22 @@ export class CacheRepositoryAdapter implements ICacheRepository {
 
     async deleteAccessToken(sessionId: string): Promise<void> {
         const key = this.key.session(sessionId);
+        await this.cacheManager.del(key);
+    }
+
+    async setEmailVerificationCode(userUuid: string, codeHash: string): Promise<void> {
+        const key = this.key.emailVerify(userUuid);
+        await this.cacheManager.set(key, codeHash, this.EMAIL_VERIFY_TTL_MS);
+    }
+
+    async getEmailVerificationCode(userUuid: string): Promise<string | null> {
+        const key = this.key.emailVerify(userUuid);
+        const data = await this.cacheManager.get<string>(key);
+        return data ?? null;
+    }
+
+    async deleteEmailVerificationCode(userUuid: string): Promise<void> {
+        const key = this.key.emailVerify(userUuid);
         await this.cacheManager.del(key);
     }
 

@@ -8,8 +8,7 @@ import { UserExistError } from "src/core/domain/errors/usuarioExistError.error";
 import { ValidationError } from "src/core/domain/errors/validation.error";
 import { UserNotFoundError } from "src/core/domain/errors/UserNotFound.error";
 import { InvalidcodeToken } from "src/core/domain/errors/InvalidCodeToken.error";
-import { LoginError } from "src/core/domain/errors/LoginError.error";
-
+import { LoginError } from "src/core/domain/errors/LoginError.error";import { EmailNotVerifiedError } from "../../core/domain/errors/EmailNotVerified.error";
 @Catch()
 export class CoreExceptionFilter implements ExceptionFilter {
     catch(exception: any, host: ArgumentsHost) {
@@ -19,6 +18,15 @@ export class CoreExceptionFilter implements ExceptionFilter {
 
         let status = 500;
         let message = "Internal server error";
+
+        // Early return: respuesta con estructura especial
+        if (exception instanceof EmailNotVerifiedError) {
+            Logger.warn(`EmailNotVerifiedError: email=${exception.email}`);
+            return response.status(403).json({
+                code: 'EMAIL_NOT_VERIFIED',
+                email: exception.email,
+            });
+        }
 
         if(exception instanceof UnauthorizedException) {
             Logger.warn(`UnauthorizedException: ${exception.message}`);

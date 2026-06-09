@@ -11,6 +11,7 @@ export class UsuarioModel extends Entity<UsuarioModel> {
     password: string;
     creacion: Date;
     activo: boolean;
+    emailVerificado: boolean;
     update?: Date | null;
     contacto?: ContactoEntity | null;
     rol: RolEntity[];
@@ -33,6 +34,7 @@ export class UsuarioModel extends Entity<UsuarioModel> {
         model.password = usuario.password;
         model.creacion = usuario.creacion;
         model.activo = usuario.activo;
+        model.emailVerificado = usuario.emailVerificado ?? false;
         model.update = usuario.update ?? null;
         model.contacto = usuario.contacto ?? null;
         model.rol = usuario.rol ?? [];
