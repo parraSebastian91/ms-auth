@@ -1,10 +1,10 @@
 import { Logger } from "@nestjs/common";
 import { JwtService, JwtSignOptions, JwtVerifyOptions } from "@nestjs/jwt";
-import { createHash, randomBytes } from "crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { performance } from "perf_hooks";
 import { RefreshSessionModel } from "./../../domain/model/RefreshSession.model";
 import { ICacheRepository } from "./../../domain/puertos/outbound/CacheRepository.interface";
 import { IRefreshSessionRepository } from "./../../domain/puertos/outbound/iRefreshSessionRepository.interface";
-import * as bcrypt from 'bcrypt';
 import { ConfigService } from "@nestjs/config";
 import { AccessTokenPayload } from "./../../domain/model/jwt.model";
 import { sessionHandler } from "../model/application.model";
@@ -14,13 +14,39 @@ import { UsuarioModel } from "src/core/domain/model/usuario.model";
 
 export class AuthAplicationService {
     private readonly logger = new Logger(AuthAplicationService.name);
+    private readonly accessSecret: string;
+    private readonly refreshSecret: string;
+    private readonly accessExpiresIn: string;
+    private readonly adminExpiresIn: string;
+    private readonly refreshExpiresIn: string;
+    private readonly ttlRefreshSession: number;
 
     constructor(
         private cacheRepository: ICacheRepository,
         private refreshSessionRepo: IRefreshSessionRepository,
         private jwtService: JwtService,
         private configService: ConfigService
-    ) { }
+    ) {
+        this.accessSecret = this.configService.get<string>('jwtConfig.access_secret');
+        this.refreshSecret = this.configService.get<string>('jwtConfig.refresh_secret');
+        this.accessExpiresIn = this.configService.get<string>('jwtConfig.access_expires_in');
+        this.adminExpiresIn = this.configService.get<string>('jwtConfig.admin_expires_in');
+        this.refreshExpiresIn = this.configService.get<string>('jwtConfig.refresh_expires_in');
+        this.ttlRefreshSession = this.configService.get<number>('app.ttlRefreshSession');
+    }
+
+    /** HMAC-SHA256 token hash — ~0.1ms vs bcrypt's ~100ms; safe because secret has 384 bits of entropy */
+    private hashTokenSecret(secret: string): string {
+        return createHmac('sha256', this.refreshSecret).update(secret).digest('hex');
+    }
+
+    /** Constant-time comparison to prevent timing attacks */
+    verifyTokenSecret(secret: string, stored: string): boolean {
+        const expected = Buffer.from(this.hashTokenSecret(secret));
+        const actual = Buffer.from(stored);
+        if (expected.length !== actual.length) return false;
+        return timingSafeEqual(expected, actual);
+    }
 
 
 
@@ -35,7 +61,7 @@ export class AuthAplicationService {
         let accesTokenCache: string | null = await this.cacheRepository.getAccessToken(sessionActive.sessionId);
         let SessionObject: AccessTokenPayload = this.jwtService.decode(accesTokenCache) as AccessTokenPayload;
         // Valido si existe session en cache, si existe la sesion en un mismo dispositivo, se rota la session 
-        if (accesTokenCache && this.jwtService.verify(accesTokenCache, { secret: this.configService.get<string>('jwtConfig.access_secret') } as JwtVerifyOptions)) {
+        if (accesTokenCache && this.jwtService.verify(accesTokenCache, { secret: this.accessSecret } as JwtVerifyOptions)) {
             this.logger.log(`session:${SessionObject.sessionId} | DB SESSION ACTIVA - | ROTACION`);
             sessionHandler = await this.rotateSession(SessionObject, meta);
         } else {
@@ -53,46 +79,43 @@ export class AuthAplicationService {
             permissions: sessionActive.permisos,
             typeDevice: sessionActive.typeDevice
         }
-        const expireToken = (sessionActive.rol.includes("SUPER_ADMIN") || sessionActive.rol.includes("ADMIN")) ?
-            this.configService.get<string>('jwtConfig.admin_expires_in') :
-            this.configService.get<string>('jwtConfig.access_expires_in')
+        const expireToken = (sessionActive.rol.includes('SUPER_ADMIN') || sessionActive.rol.includes('ADMIN')) ?
+            this.adminExpiresIn : this.accessExpiresIn;
         const accessToken = this.jwtService.sign(
             payload,
-            {
-                expiresIn: expireToken,
-                secret: this.configService.get<string>('jwtConfig.access_secret')
-            } as JwtSignOptions);
+            { expiresIn: expireToken, secret: this.accessSecret } as JwtSignOptions);
 
-        await this.cacheRepository.setAccessToken(
-            payload.sessionId,
-            accessToken
-        ).then(() => {
-            this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
-        });
+        await this.cacheRepository.setAccessToken(payload.sessionId, accessToken);
+        this.logger.log(`Sesión cacheada para usuario ${payload.userUuid} con clave session:${payload.sessionId}`);
 
         const refreshToken = this.jwtService.sign(
             { refreshToken: sessionHandler.plainToken },
-            {
-                expiresIn: this.configService.get<string>('jwtConfig.refresh_expires_in'),
-                secret: this.configService.get<string>('jwtConfig.refresh_secret')
-            } as JwtSignOptions);
+            { expiresIn: this.refreshExpiresIn, secret: this.refreshSecret } as JwtSignOptions);
 
         this.logger.log("REFRESH SESSION - OK");
         return { accessToken, refreshToken };
     }
 
     public async rotateSession(SessionObject: AccessTokenPayload, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<sessionHandler> {
-        this.logger.log("ROTATE SESSION - INIT");
-        this.refreshSessionRepo.revokeById(SessionObject.sessionUuid);
-        this.cacheRepository.deleteAccessToken(SessionObject.sessionId);
-        const date = new Date();
-        date.setMilliseconds(Date.now() + this.configService.get<number>('app.ttlRefreshSession'))
-        const expiresAt = date;
+        const t0 = performance.now();
+        const lap = (label: string, prev: number) => {
+            const ms = (performance.now() - prev).toFixed(1);
+            this.logger.debug(`[ROTATE_PERF] step="${label}" ms=${ms}`);
+            return performance.now();
+        };
+        let t = t0;
+        this.logger.log('ROTATE SESSION - INIT');
 
-        console.log(expiresAt)
-        SessionObject.sessionId = SessionObject.sessionId;
+        await Promise.all([
+            this.refreshSessionRepo.revokeById(SessionObject.sessionUuid),
+            this.cacheRepository.deleteAccessToken(SessionObject.sessionId),
+        ]);
+        t = lap('db.revokeById + redis.deleteToken (parallel)', t);
+
+        const expiresAt = new Date(Date.now() + this.ttlRefreshSession);
         const secret = randomBytes(48).toString('hex');
-        const hash = await bcrypt.hash(secret, 10);
+        const hash = this.hashTokenSecret(secret);
+        t = lap('hmac.hashTokenSecret', t);
 
         const oldSession = RefreshSessionModel.create({
             sessionId: SessionObject.sessionId,
@@ -116,19 +139,22 @@ export class AuthAplicationService {
             ip: oldSession.ip,
             userAgent: oldSession.userAgent,
             expiresAt,
-            rotationParentId: oldSession.id
+            rotationParentId: oldSession.id,
         });
-        const sessionRotated = await this.refreshSessionRepo.rotate(oldSession, newSession);
 
+        const sessionRotated = await this.refreshSessionRepo.rotate(oldSession, newSession);
+        t = lap('db.rotate (transaction: update+insert)', t);
+
+        this.logger.debug(`[ROTATE_PERF] TOTAL=${(performance.now() - t0).toFixed(1)}ms`);
         return { plainToken: `${sessionRotated.sessionId}.${sessionRotated.sessionUuid}.${secret}`, session: sessionRotated };
     }
 
     private async createSession(sessionActive: AuthCodeStored, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<sessionHandler> {
-        this.logger.warn(`CREATE SESSION - INIT`);
-        const expiresAt = new Date(Date.now() + this.configService.get<number>('app.ttlRefreshSession'));
+        this.logger.warn('CREATE SESSION - INIT');
+        const expiresAt = new Date(Date.now() + this.ttlRefreshSession);
 
         const secret = randomBytes(48).toString('hex');
-        const hash = await bcrypt.hash(secret, 10);
+        const hash = this.hashTokenSecret(secret);
         const session = RefreshSessionModel.create({
             sessionId: sessionActive.sessionId,
             userId: sessionActive.userId,

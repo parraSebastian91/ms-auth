@@ -15,34 +15,33 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             useFactory: async (vaultService: VaultService, configService: ConfigService) => {
                 let dbConfig: any = {
                     type: 'postgres' as const,
-                    host: configService.get('database.host') ,
-                    port: configService.get('database.port') ,
-                    username: configService.get('database.username') ,
-                    password: configService.get('database.password') ,
+                    host: configService.get('database.host'),
+                    port: configService.get('database.port'),
+                    username: configService.get('database.username'),
+                    password: configService.get('database.password'),
                     database: configService.get('database.database'),
                     schema: configService.get('database.schema'),
                     entities: [__dirname + '/entities/*.entity{.ts,.js}'],
-                    synchronize: false,  // ← NO usar true en producción
-                    // ✅ ACTIVAR LOGGING COMPLETO
-                    logging: false,  // O más específico:  ['query', 'error', 'schema', 'warn', 'info', 'log']
-                    logger: 'advanced-console',  // O 'debug', 'simple-console'
-                    
-                    // ✅ Ver todas las queries
+                    synchronize: false,
+                    logging: false,
+                    logger: 'advanced-console',
                     maxQueryExecutionTime: 1000,
-                    // ✅ SSL
                     ssl: true,
-                    // ✅ Opciones adicionales de debugging
                     extra: {
-                        // Ver detalles de conexión
-                        connectionTimeoutMillis: 5000,
-                        query_timeout: 10000,
-                        statement_timeout: 10000,
                         ssl: true,
+                        // Connection pool
+                        max: 20,                        // was unset (defaulted to ~10); 20 handles burst traffic
+                        min: 2,                         // keep 2 warm connections idle at all times
+                        idleTimeoutMillis: 30_000,      // release idle connections after 30s
+                        connectionTimeoutMillis: 3_000, // fail fast if pool is full (was 5000)
+                        // Keep TCP connections alive so reconnect latency doesn't spike queries
+                        keepAlive: true,
+                        keepAliveInitialDelayMillis: 10_000,
+                        query_timeout: 10_000,
+                        statement_timeout: 10_000,
                     },
-                }
-                console.log(dbConfig);
+                };
                 return dbConfig;
-
             },
         })
     ],
