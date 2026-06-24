@@ -17,21 +17,26 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
   async create(session: RefreshSessionModel): Promise<RefreshSessionModel> {
     const entity = this.repo.create(RefreshSessionMapper.toEntity(session));
     const saved = await this.repo.save(entity);
-
-    const reloaded = await this.repo.findOne({
-      where: { id: saved.id },
-      relations: ['user'],
-    });
-
-    if (!reloaded) {
-      throw new Error('Refresh session not found after save');
-    }
-
-    return RefreshSessionMapper.toDomain(reloaded);
+    // Populate user FK from the model so toDomain can read it without a second query
+    saved.user = { id: session.userId, usuarioUuid: session.userUuid } as any;
+    return RefreshSessionMapper.toDomain(saved);
   }
 
   async findById(sessionUuid: string): Promise<RefreshSessionModel | null> {
     const found = await this.repo.findOne({
+      select: {
+        id: true,
+        sessionUuid: true,
+        sessionId: true,
+        refreshTokenHash: true,
+        revokedAt: true,
+        expiresAt: true,
+        deviceType: true,
+        deviceFingerprint: true,
+        ip: true,
+        userAgent: true,
+        user: { id: true, usuarioUuid: true } as any,
+      },
       where: { sessionUuid },
       relations: ['user'],
     });
@@ -71,17 +76,9 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
       );
 
       const saved = await manager.save(created);
-
-      const reloaded = await manager.findOne(RefreshSessionEntity, {
-        where: { id: saved.id },
-        relations: ['user'],
-      });
-
-      if (!reloaded) {
-        throw new Error('Rotated session not found after save');
-      }
-
-      return RefreshSessionMapper.toDomain(reloaded);
+      // Populate user FK from the model — avoids a third round-trip inside the transaction
+      saved.user = { id: newSession.userId, usuarioUuid: newSession.userUuid } as any;
+      return RefreshSessionMapper.toDomain(saved);
     });
   }
 

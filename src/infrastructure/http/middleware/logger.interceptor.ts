@@ -24,6 +24,10 @@ export class LoggerInterceptor implements NestInterceptor {
     const userAgent = (request as any).get?.('user-agent') || (request as any).headers?.['user-agent'];
     const startTime = Date.now();
 
+    if(url.includes('/health')) {
+      return next.handle();
+    }
+
     this.logger.log(`[ENTRADA] ${method} ${url} | RequestID: ${requestId} | IP: ${ip} | User-Agent: ${userAgent} | SessionID: ${sessionID}`);
 
     return next.handle().pipe(
