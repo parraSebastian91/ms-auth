@@ -11,18 +11,19 @@ const cookieParser = require('cookie-parser');
 import * as vault from 'node-vault';
 
 async function preloadVaultToEnv() {
-  const client = vault({
+  const vauldEndpoint = {
     apiVersion: 'v1',
     endpoint: process.env.VAULT_ADDR || 'http://vault:8200',
     token: process.env.VAULT_TOKEN || 'myroot',
-  });
+  }
+  const client = vault(vauldEndpoint);
 
   const paths = ['JWT', 'DB-SEIS-POSTGRES', 'REDIS', 'SHARED'];
 
   for (const path of paths) {
     try {
       const res = await client.read(`secret/data/${path}`);
-      const data = res?.data?.data ?? {};
+      const data = res.data.data;
       for (const [k, v] of Object.entries(data)) {
         const envKey = String(k).toUpperCase();
         if (!process.env[envKey] && v !== undefined && v !== null) {
