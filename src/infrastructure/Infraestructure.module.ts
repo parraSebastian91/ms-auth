@@ -24,7 +24,11 @@ import { UsuarioEntity } from './database/entities/usuario.entity';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
 import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
 import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
-import { ConfigModule, ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
+import {
+  ConfigModule,
+  ConfigService,
+  ConfigModule as NestConfigModule,
+} from '@nestjs/config';
 import { SecretsModule } from './secrets/secrets.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
@@ -35,64 +39,66 @@ import { ConsoleEmailAdapter } from './adapter/consoleEmail.adapter';
 import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.interface';
 
 @Module({
-    imports: [
-        DatabaseModule,
-        SecretsModule,
-        HttpServerModule,
-        MetricsModule,
-        ConfigModule,
-        TypeOrmModule.forFeature([
-            ContactoEntity,
-            CuentaBancariaEntity,
-            ModuloEntity,
-            OrganizacionEntity,
-            OrganizacionContactoEntity,
-            OrganizacionSistemaEntity,
-            PermisoEntity,
-            RolEntity,
-            RolModuloPermisoEntity,
-            SistemaEntity,
-            TipoContactoEntity,
-            UsuarioEntity,
-            FuncionalidadEntity,
-            RefreshSessionEntity
-        ]),
-        CacheModule.register({
-            isGlobal: true,
-            imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: async (configService: ConfigService) => ({
-                isGlobal: true,
-                store: RedisStore,
-                host: configService.get('redis.host') || 'localhost',
-                port: configService.get('redis.port') || '6379',
-                ttl: configService.get('redis.ttl') || '3600', // 1 hora por defecto
-            }),
-        }),
-        NestConfigModule.forRoot({
-            isGlobal: true,
-            envFilePath: ['.env.dev', '.env'],
-        }),
-    ],
-    providers: [
-        UsuarioRepositoryAdapter,
-        ContactoRepositoryAdapter,
-        RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter,
-        PasswordResetRepositoryAdapter,
-        CacheRepositoryAdapter,
-        { provide: EMAIL_SERVICE, useClass: ConsoleEmailAdapter },
-    ],
-    exports: [
-        UsuarioRepositoryAdapter,
-        ContactoRepositoryAdapter,
-        RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter,
-        SecretsModule,
-        MetricsModule,
-        PasswordResetRepositoryAdapter,
-        CacheRepositoryAdapter,
-        EMAIL_SERVICE,
-    ],
+  imports: [
+    DatabaseModule,
+    SecretsModule,
+    HttpServerModule,
+    MetricsModule,
+    ConfigModule,
+    TypeOrmModule.forFeature([
+      ContactoEntity,
+      CuentaBancariaEntity,
+      ModuloEntity,
+      OrganizacionEntity,
+      OrganizacionContactoEntity,
+      OrganizacionSistemaEntity,
+      PermisoEntity,
+      RolEntity,
+      RolModuloPermisoEntity,
+      SistemaEntity,
+      TipoContactoEntity,
+      UsuarioEntity,
+      FuncionalidadEntity,
+      RefreshSessionEntity,
+    ]),
+    CacheModule.register({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const redisHost = configService.get<string>('redis.host', 'seis_erp_redis');
+        const redisPort = configService.get<number>('redis.port', 6379);
+        const redisTTL = configService.get<number>('redis.ttl', 3600) * 1000; // Convertir a milisegundos
+        console.log(`Configuración de Redis: host=${redisHost}, port=${redisPort}, ttl=${redisTTL}ms`);
+        return {
+          isGlobal: true,
+          store: RedisStore,
+          host: redisHost,
+          port: redisPort,
+          ttl: redisTTL, // 1 hora por defecto
+        }
+      },
+    }),
+  ],
+  providers: [
+    UsuarioRepositoryAdapter,
+    ContactoRepositoryAdapter,
+    RolRepositoryAdapter,
+    RefreshSessionRepositoryAdapter,
+    PasswordResetRepositoryAdapter,
+    CacheRepositoryAdapter,
+    { provide: EMAIL_SERVICE, useClass: ConsoleEmailAdapter },
+  ],
+  exports: [
+    UsuarioRepositoryAdapter,
+    ContactoRepositoryAdapter,
+    RolRepositoryAdapter,
+    RefreshSessionRepositoryAdapter,
+    SecretsModule,
+    MetricsModule,
+    PasswordResetRepositoryAdapter,
+    CacheRepositoryAdapter,
+    EMAIL_SERVICE,
+  ],
 })
-export class InfraestructureModule { }
+export class InfraestructureModule {}

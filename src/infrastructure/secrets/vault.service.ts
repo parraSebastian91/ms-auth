@@ -4,6 +4,12 @@ import * as vault from 'node-vault';
 interface VaultSecrets {
   [key: string]: any;
 }
+const SECRETS = {
+  DB_POSTGRES: process.env.SECRET_DB_KEY,
+  CACHE_REDIS: process.env.SECRET_REDIS_KEY,
+  JWT: process.env.SECRET_JWT_KEY,
+  SHARED: process.env.SECRET_SHARED_KEY,
+}
 
 @Injectable()
 export class VaultService implements OnModuleInit {
@@ -30,8 +36,8 @@ export class VaultService implements OnModuleInit {
   }
 
   private async initializeVault() {
-    const vaultAddr = process.env.VAULT_ADDR || 'http://vault:8200';
-    const vaultToken = process.env.VAULT_TOKEN || 'myroot';
+    const vaultAddr = process.env.VAULT_ADDR;
+    const vaultToken = process.env.VAULT_TOKEN;
 
     this.logger.log(`Connecting to Vault at ${vaultAddr}`);
 
@@ -42,26 +48,31 @@ export class VaultService implements OnModuleInit {
     });
 
     // Verificar conexión
-    await this.client.health();
+    try {
+      await this.client.health();
+    } catch (error) {
+      this.logger.error('❌ Vault health check failed', error);
+      throw new Error('Vault is not reachable or healthy');
+    }
   }
 
   private async loadAllSecrets() {
     try {
       // Cargar secretos de auth-service
-      const authSecrets = await this.readSecret('JWT');
-      this.secrets.set('auth-service', authSecrets);
+      const authSecrets = await this.readSecret(SECRETS.JWT);
+      this.secrets.set(SECRETS.JWT, authSecrets);
 
       // Cargar secretos de database
-      const dbSecrets = await this.readSecret('DB-SEIS-POSTGRES');
-      this.secrets.set('DB-SEIS-POSTGRES', dbSecrets);
+      const dbSecrets = await this.readSecret(SECRETS.DB_POSTGRES);
+      this.secrets.set(SECRETS.DB_POSTGRES, dbSecrets);
 
       // Cargar secretos de Redis
-      const redisSecrets = await this.readSecret('CACHE-SEIS-REDIS');
-      this.secrets.set('CACHE-SEIS-REDIS', redisSecrets);
+      const redisSecrets = await this.readSecret(SECRETS.CACHE_REDIS);
+      this.secrets.set(SECRETS.CACHE_REDIS, redisSecrets);
 
       // Cargar secretos compartidos
-      const sharedSecrets = await this.readSecret('shared');
-      this.secrets.set('shared', sharedSecrets);
+      const sharedSecrets = await this.readSecret(SECRETS.SHARED);
+      this.secrets.set(SECRETS.SHARED, sharedSecrets);
 
       this.logger.log(`Loaded ${this.secrets.size} secret paths`);
     } catch (error) {

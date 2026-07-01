@@ -4,6 +4,11 @@
 /build
 *.tsbuildinfo
 
+# Environment files — NEVER commit real credentials
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log
