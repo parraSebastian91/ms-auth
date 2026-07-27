@@ -1,124 +1,475 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# ms-auth - Microservicio de Autenticacion y Autorizacion
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+**Servicio:** ms-auth  
+**Puerto:** 3000 (configurable via `PORT`)  
+**Version:** 0.0.1  
+**Ultima actualizacion:** 2026-07-26
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Proposito
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Microservicio responsable de autenticacion, autorizacion, gestion de sesiones y registro de usuarios en SEIS_App. Maneja JWT tokens, refresh tokens, permisos basados en roles, y recuperacion de contraseñas.
 
-## Project setup
+---
 
-```bash
-$ npm install
+## Arquitectura
+
+```
+Frontend → BFF (3002) → ms-auth (3000)
+                            ↓
+                   PostgreSQL + Redis + Vault
 ```
 
-## Compile and run the project
+### Responsabilidades
 
-```bash
-# development
-$ npm run start
+- ✅ Autenticacion: Login/Logout
+- ✅ Registro de usuarios y organizaciones
+- ✅ Gestion de sesiones con Redis
+- ✅ Refresh tokens (7 dias de validez)
+- ✅ Recuperacion de contraseña (reset password)
+- ✅ Validacion de permisos y roles
+- ✅ Guards JWT para proteger endpoints
 
-# watch mode
-$ npm run start:dev
+---
 
-# production mode
-$ npm run start:prod
+## Stack Tecnologico
+
+- **Framework:** NestJS 10 + TypeScript
+- **Base de datos:** PostgreSQL (usuarios, roles, permisos, sesiones)
+- **Cache:** Redis (sesiones activas, refresh tokens)
+- **Secrets:** Vault (JWT_SECRET, DB credentials)
+- **Autenticacion:** JWT (access token) + Refresh Token (cookie HttpOnly)
+- **Hashing:** bcrypt para passwords
+
+---
+
+## Controllers (3 Endpoints Groups)
+
+### 1. Health Check (`/health`)
+**Controller:** `health.controller.ts`  
+**Auth:** Publica
+
+- `GET /health` - Estado del servicio
+
+---
+
+### 2. Autenticacion (`/security`)
+**Controller:** `auth.controller.ts`  
+**Auth:** Publica (excepto endpoints protegidos)
+
+#### Endpoints Publicos
+
+**Login**
+- `POST /security/login`
+  - Body: `{ username, password }`
+  - Response: JWT access token + refresh token en cookie `auth.refresh`
+  - Cookie `auth.session` firmada (7 dias)
+
+**Logout**
+- `POST /security/logout`
+  - Invalida sesion en Redis
+  - Limpia cookies
+
+**Refresh Session**
+- `POST /security/session/refresh`
+  - Body: `{ typeDevice: string }`
+  - Lee refresh token desde cookie `auth.refresh`
+  - Genera nuevo access token si refresh valido
+  - Response: Nuevo JWT
+
+**Password Reset**
+- `POST /security/password/request`
+  - Body: `{ email }`
+  - Envia email con token de reset
+- `POST /security/password/validate-token`
+  - Body: `{ token }`
+  - Valida token de reset
+- `POST /security/password/reset`
+  - Body: `{ token, newPassword }`
+  - Resetea password con token valido
+
+#### Endpoints Protegidos
+
+**Authorization Check**
+- `POST /security/authorization`
+  - Body: `{ userId, resource, action }`
+  - Valida si el usuario tiene permisos para ejecutar accion en recurso
+
+**Test Session**
+- `ALL /security/session/test`
+  - Endpoint de debugging para verificar cookies y sesion
+
+---
+
+### 3. Registro (`/registro`)
+**Controller:** `registro.controller.ts`  
+**Auth:** Publica
+
+**Registro de Usuario + Organizacion**
+- `POST /registro`
+  - Body: Datos de usuario y organizacion
+  - Crea usuario, organizacion y asigna roles iniciales
+  - Response: Confirmacion de registro
+
+---
+
+## Use Cases
+
+### AuthUseCase (IAuthUseCase)
+
+**Comandos:**
+- `ExecuteAuthentication(AuthenticationCommand)` - Login de usuario
+- `ExecuteRefreshSession(refreshSessionCommand)` - Renovar access token
+- `ExecuteAuthorization(authorizationCommand)` - Validar permisos
+- `ExecuteRequestPasswordReset(RequestPasswordResetCommand)` - Solicitar reset
+- `ExecuteValidateResetToken(validateResetTokenCommand)` - Validar token reset
+- `ExecuteResetPassword(ResetPasswordCommand)` - Resetear password
+
+### RegistroUseCase (IRegistroUseCase)
+
+**Comandos:**
+- `ExecuteRegistro(RegistroCommand)` - Registrar usuario + organizacion
+
+---
+
+## Autenticacion y Sesiones
+
+### Flujo de Login
+
+1. Usuario envia `POST /security/login` con username/password
+2. ms-auth valida credenciales contra PostgreSQL
+3. Si valido:
+   - Genera JWT access token (15-30 min expiracion)
+   - Genera refresh token (7 dias)
+   - Guarda sesion en Redis con datos de usuario
+   - Setea cookies:
+     - `auth.session` (firmada, HttpOnly, 7 dias)
+     - `auth.refresh` (HttpOnly, 7 dias)
+4. Response con JWT en body
+
+### Flujo de Refresh
+
+1. Cliente detecta access token expirado
+2. Envia `POST /security/session/refresh` con refresh token en cookie
+3. ms-auth valida refresh token en Redis
+4. Si valido, genera nuevo access token
+5. Response con nuevo JWT
+
+### Sesiones en Redis
+
+**Key pattern:** `session:{sessionId}`
+
+**Contenido:**
+```json
+{
+  "userId": "uuid",
+  "username": "usuario@example.com",
+  "roles": ["USR_STD", "CLIENTE_CEDENTE"],
+  "organizacionId": "uuid",
+  "authenticated": true,
+  "accessToken": "jwt...",
+  "refreshToken": "token...",
+  "expiresAt": 1721980800
+}
 ```
 
-## Run tests
+**TTL:** 7 dias (REFRESH_COOKIE_MAX_AGE_MS)
+
+---
+
+## Roles y Permisos
+
+### Roles Disponibles
+
+| Rol | Descripcion |
+|-----|-------------|
+| `USR_STD` | Usuario autenticado base |
+| `CLIENTE_CEDENTE` | Empresa emisora de facturas |
+| `ADMIN_CEDENTE` | Administrador de empresa cedente |
+| `EJECUTIVO_FINANCIADORA` | Ejecutiva de factoring |
+| `ADMIN_FINANCIADORA` | Administrador de financiadora |
+| `SUPER_ADMIN` | Acceso total al sistema |
+
+### Guards
+
+**JwtAuthGuard:** Valida JWT en header `Authorization: Bearer <token>`
+
+**PermissionsGuard:** Valida permisos granulares (resource + action)
+
+**Decoradores:**
+- `@Public()` - Endpoint publico sin autenticacion
+- `@Roles(...roles)` - Requiere uno de los roles especificados
+
+---
+
+## Variables de Entorno
+
+### Vault (Preloaded)
+
+Paths leidos en bootstrap: `JWT`, `DB-SEIS-POSTGRES`, `REDIS`, `SHARED`
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+VAULT_ADDR=http://vault:8200
+VAULT_TOKEN=myroot
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Servicio
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+PORT=3000
+NODE_ENV=production|development
+JWT_SECRET=<leido desde Vault>
+JWT_EXPIRES_IN=30m
+REFRESH_TOKEN_EXPIRES_IN=7d
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Base de Datos (desde Vault)
 
-## Resources
+```bash
+DB_HOST=postgres
+DB_PORT=5432
+DB_USERNAME=seis_user
+DB_PASSWORD=<desde Vault>
+DB_DATABASE=seis_erp
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### Redis (desde Vault)
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
-
-PORT=3001
-NODE_ENV=development
-LOG_LEVEL=info
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=desarrollo
-DATABASE_PASSWORD=071127
-DATABASE_NAME=postgres
-DATABASE_SCHEMA=core
-JWT_SECRET=SECRETING
-JWT_EXPIRES_IN=5m
-JWT_REFRESH_EXPIRES_IN=604800
-REDIS_HOST=localhost
+```bash
+REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_PASSWORD=<desde Vault>
+```
 
-🔥 Solución de Problemas
-Si no funciona, verifica:
+---
 
-Firewall de Windows: Asegúrate de que el puerto 5432 esté abierto
-WSL2 IP dinámica: La IP puede cambiar al reiniciar WSL
-Docker binding: Verificar que Docker esté bindeando a 0.0.0.0 y no solo 127.0.0.1
-📋 Script para obtener la IP actual
-echo "WSL2 IP: $(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')"
+## Estructura de Directorios
+
+```
+src/
+├── main.ts                          # Bootstrap + Vault
+├── app.module.ts                    # Modulo raiz
+├── core/
+│   ├── core.module.ts
+│   ├── aplication/
+│   │   └── useCase/
+│   │       ├── auth/
+│   │       │   ├── auth.usecase.ts          # AuthUseCase implementacion
+│   │       │   └── command/                 # Commands (AuthenticationCommand, etc.)
+│   │       └── registro/
+│   │           └── registro.usecase.impl.ts # RegistroUseCase implementacion
+│   └── domain/
+│       ├── entities/                        # Usuario, Rol, Permiso
+│       ├── repositories/                    # Interfaces de repositorios
+│       └── puertos/
+│           ├── inbound/                     # IAuthUseCase, IRegistroUseCase
+│           └── outbound/                    # IUserRepository, ISessionRepository
+└── infrastructure/
+    ├── http/
+    │   ├── controllers/                     # auth, registro, health
+    │   ├── model/dto/                       # DTOs (LoginDto, RegistroDto, etc.)
+    │   ├── decorators/                      # @Public(), @Roles()
+    │   └── guards/                          # JwtAuthGuard, PermissionsGuard
+    ├── persistence/
+    │   ├── typeorm/                         # Repositorios TypeORM
+    │   └── redis/                           # Sesiones Redis
+    └── exceptionFileter/
+        └── CoreException.filter.ts          # Exception filter
+```
+
+---
+
+## Dependencias Criticas
+
+- **PostgreSQL:** Si cae, no hay login ni validacion de credenciales
+- **Redis:** Si cae, no hay sesiones (todas las sesiones activas se pierden)
+- **Vault:** Si no esta en startup, el servicio no arranca (sin JWT_SECRET)
+
+---
+
+## Desarrollo
+
+### Instalar dependencias
+
+```bash
+npm install
+```
+
+### Iniciar en desarrollo
+
+```bash
+npm run start:dev
+```
+
+### Build
+
+```bash
+npm run build
+```
+
+### Testing
+
+```bash
+npm run test          # Unit tests
+npm run test:e2e      # E2E tests
+npm run test:cov      # Coverage
+```
+
+---
+
+## Docker
+
+### Build
+
+```bash
+docker build -t ms-auth:latest .
+```
+
+### Logs
+
+```bash
+docker logs ms-auth -f
+```
+
+---
+
+## Healthcheck
+
+```bash
+curl http://localhost:3000/health
+```
+
+Respuesta esperada:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-07-26T12:00:00.000Z"
+}
+```
+
+---
+
+## Integracion con BFF
+
+El BFF (puerto 3002) consume ms-auth via HTTP para:
+
+1. **Validar sesiones:** BFF envia `sessionId` desde cookie, ms-auth valida contra Redis
+2. **Refresh tokens:** BFF proxy requests de `/security/session/refresh` a ms-auth
+3. **Autorizacion:** BFF valida permisos antes de llamar a ms-core
+
+**Patron:**
+- BFF duplica `JwtAuthGuard` para validar JWT localmente (evita llamadas innecesarias)
+- BFF llama a ms-auth solo para operaciones de escritura (login, logout, refresh)
+
+---
+
+## Seguridad
+
+### Password Storage
+
+- **Hashing:** bcrypt con salt rounds 10
+- **Nunca** se almacena password en plain text
+- **Nunca** se retorna password en responses
+
+### JWT
+
+- **Access Token:** Expira en 30 minutos (configurable)
+- **Refresh Token:** Expira en 7 dias, almacenado en Redis
+- **Secret:** Rotable via Vault
+
+### Cookies
+
+- **HttpOnly:** JavaScript no puede acceder
+- **Secure:** Solo HTTPS en produccion
+- **SameSite:** `lax` para prevenir CSRF
+
+### Rate Limiting
+
+⚠️ **Pendiente implementar:** Throttling de login attempts por IP/usuario
+
+---
+
+## Logs y Debugging
+
+### Logs de NestJS
+
+Cada request incluye:
+- `[LOGIN]`, `[SESSION_REFRESH]`, `[LOGOUT]` prefijos
+- `requestId` para trazabilidad
+- `sessionId` para debugging de sesiones
+
+### Ejemplo de log exitoso
+
+```
+[LOGIN] INIT requestId=abc123 ip=192.168.1.100
+[LOGIN] SUCCESS requestId=abc123 userId=uuid-456 sessionId=sess-789
+```
+
+### Ejemplo de log fallido
+
+```
+[LOGIN] INVALID_CREDENTIALS requestId=abc123 username=user@example.com
+```
+
+---
+
+## Troubleshooting
+
+### Login falla con 401
+
+1. Verificar credenciales en PostgreSQL
+2. Revisar logs: `docker logs ms-auth -f`
+3. Verificar Redis: `redis-cli ping`
+4. Validar JWT_SECRET en Vault
+
+### Refresh token no funciona
+
+1. Verificar cookie `auth.refresh` en browser DevTools
+2. Revisar sesion en Redis: `redis-cli get session:<sessionId>`
+3. Verificar TTL: `redis-cli ttl session:<sessionId>`
+
+### Sesiones se pierden aleatoriamente
+
+1. Revisar memoria Redis: `redis-cli info memory`
+2. Verificar eviction policy: `redis-cli config get maxmemory-policy`
+3. Revisar logs de Redis por evictions
+
+---
+
+## Roadmap / Pendiente
+
+- [ ] Rate limiting en `/security/login` (max 5 intentos por minuto por IP)
+- [ ] OAuth2 / SSO con proveedores externos (Google, Microsoft)
+- [ ] Multi-factor authentication (MFA)
+- [ ] Auditoria de accesos (logs de login/logout a tabla audit)
+- [ ] Rotacion automatica de refresh tokens
+- [ ] Endpoint para revocar sesiones activas
+- [ ] Metricas Prometheus (logins/min, refresh/min, login failures)
+
+---
+
+## Referencias
+
+- **MONOREPO_ARCHITECTURE.md** - Arquitectura completa
+- **CLAUDE.md** - ADN del proyecto
+- **Guards:** BFF tambien implementa JwtAuthGuard (sin SPOF)
+- **Graphify:** ~/Documents/Proyectos/SEIS_APP/graphify-out/graph.json
+
+---
+
+## Contacto / Contribucion
+
+Este servicio es parte del monorepo SEIS_App. Para cambios:
+
+1. Seguir Clean Architecture: dominio → aplicacion → infraestructura
+2. Nunca exponer passwords en logs o responses
+3. JWT secret solo via Vault
+4. Guards duplicados en BFF (no hay SPOF)
+5. Actualizar CLAUDE.md si haces cambios arquitectonicos
+
+---
+
+**Ultima actualizacion:** 2026-07-26  
+**Maintainer:** Sebastian Parra (@parraSebastian91)
