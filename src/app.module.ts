@@ -9,6 +9,7 @@ import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.ada
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
 import { PasswordResetRepositoryAdapter } from './infrastructure/adapter/passwordResetRepository.adapter';
 import { CacheRepositoryAdapter } from './infrastructure/adapter/cacheRepository.adapter';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 
 @Module({
   imports: [
@@ -17,6 +18,12 @@ import { CacheRepositoryAdapter } from './infrastructure/adapter/cacheRepository
       load: [configurations],
       isGlobal: true,
       envFilePath: ['.env']
+    }),
+    PrometheusModule.register({
+      defaultMetrics: {
+        enabled: true,
+      },
+      path: '/metrics',
     }),
     CoreModule.register({
       modules: [InfraestructureModule],
