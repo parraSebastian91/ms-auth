@@ -12,6 +12,8 @@ import { Public } from '../decorators/public.decorator';
 import { RequestPasswordResetDto, ResetPasswordDto, ValidateResetTokenDto } from '../model/dto/forgot-password.dto';
 import { IAuthUseCase } from 'src/core/domain/puertos/inbound/IAuthUseCase.interface';
 import { AuthenticationCommand, authorizationCommand, refreshSessionCommand, RequestPasswordResetCommand, ResetPasswordCommand, validateResetTokenCommand } from 'src/core/aplication/useCase/auth/command/AuthCommand.interface';
+import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import { Counter } from 'prom-client';
 
 interface bodyRefresh {
   typeDevice: string;
@@ -25,7 +27,10 @@ const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export class AuthController {
 
   constructor(@
-    Inject(AUTH_USE_CASE) private readonly authUseCase: IAuthUseCase
+    Inject(AUTH_USE_CASE) private readonly authUseCase: IAuthUseCase,
+    @InjectMetric('auth_login_attempts_total') private readonly loginAttemptsCounter: Counter<string>,
+    @InjectMetric('auth_token_refresh_total') private readonly tokenRefreshCounter: Counter<string>,
+    @InjectMetric('auth_password_reset_requests_total') private readonly passwordResetCounter: Counter<string>,
   ) { }
   private readonly logger = new Logger(AuthController.name);
 
@@ -95,6 +100,8 @@ export class AuthController {
       );
     }
 
+    this.tokenRefreshCounter.inc();
+
     // ✅ MARCAR LA SESIÓN COMO AUTENTICADA
     session.authenticated = true;
     session.accessToken = tokens.accessToken; // si lo tienes en el response
@@ -135,13 +142,20 @@ export class AuthController {
       CorrelationId: loginDto.CorrelationId,
       requestId
     };
-    const result = await this.authUseCase.ExcuteAuthentication(command);
-    if (!result) {
-      this.logger.warn(`[AUTHENTICATE] FAILED requestId=${requestId} username=${loginDto.username}`);
-      return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
+    try {
+      const result = await this.authUseCase.ExcuteAuthentication(command);
+      if (!result) {
+        this.logger.warn(`[AUTHENTICATE] FAILED requestId=${requestId} username=${loginDto.username}`);
+        this.loginAttemptsCounter.inc({ result: 'failure' });
+        return res.status(NestHttpStatus.UNAUTHORIZED).json(new ApiResponse(NestHttpStatus.UNAUTHORIZED, 'Credenciales inválidas', null));
+      }
+      this.loginAttemptsCounter.inc({ result: 'success' });
+      this.logger.log(`[AUTHENTICATE] SUCCESS requestId=${requestId} username=${loginDto.username} redirects=${result.length}`);
+      return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Login exitoso', result));
+    } catch (error) {
+      this.loginAttemptsCounter.inc({ result: 'failure' });
+      throw error;
     }
-    this.logger.log(`[AUTHENTICATE] SUCCESS requestId=${requestId} username=${loginDto.username} redirects=${result.length}`);
-    return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Login exitoso', result));
   }
 
   @Post('callback')
@@ -253,6 +267,7 @@ export class AuthController {
     const response = await this.authUseCase.ExecuteRequestPasswordRequest(
       command
     );
+    this.passwordResetCounter.inc();
     this.logger.log(`[PASSWORD_RESET_REQUEST] SUCCESS requestId=${requestId} email=${dto.correo}`);
     return response;
   }

@@ -4,6 +4,8 @@ import { Public } from '../decorators/public.decorator';
 import { IRegistroUseCase } from 'src/core/domain/puertos/inbound/IRegistro.usecase.interface';
 import { FormRegisterDto } from '../model/dto/formRegister.dto';
 import { IsNotEmpty, IsString, Length, IsEmail } from 'class-validator';
+import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import { Counter } from 'prom-client';
 
 class VerificarEmailDto {
     @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
@@ -25,7 +27,8 @@ class ResendOtpDto {
 export class RegistroController {
     private readonly logger = new Logger(RegistroController.name);
     constructor(
-        @Inject('REGISTRO_USE_CASE') private readonly registroUseCase: IRegistroUseCase
+        @Inject('REGISTRO_USE_CASE') private readonly registroUseCase: IRegistroUseCase,
+        @InjectMetric('auth_register_attempts_total') private readonly registerAttemptsCounter: Counter<string>,
     ) { }
 
     @Get("check/:field")
@@ -55,8 +58,10 @@ export class RegistroController {
         const result = await this.registroUseCase.executeCreateRegistro(FormRegisterDto.toDomain(body));
         if (!result.success) {
             this.logger.warn(`[FAIL] createRegistro - CorrelationID: ${correlationId}, Message: ${result.message ?? 'Error al crear el registro'}`);
+            this.registerAttemptsCounter.inc({ result: 'failure' });
             return res.status(400).json({ message: result.message ?? "Error al crear el registro" });
         }
+        this.registerAttemptsCounter.inc({ result: 'success' });
         this.logger.debug(`[END] createRegistro - CorrelationID: ${correlationId}, Duration: ${Date.now() - startedAt}ms`);
         return res.status(201).json({ message: "Registro creado exitosamente. Revisa tu correo para verificar tu cuenta.", email: body.email });
     }
