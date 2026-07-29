@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { VaultService } from '../secrets/vault.service';
 import { SecretsModule } from '../secrets/secrets.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -11,8 +10,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         SecretsModule,
         TypeOrmModule.forRootAsync({
             imports: [SecretsModule, ConfigModule],
-            inject: [VaultService, ConfigService],
-            useFactory: async (vaultService: VaultService, configService: ConfigService) => {
+            inject: [ConfigService],
+            useFactory: async (configService: ConfigService) => {
+                console.log( configService.get('database'));
                 let dbConfig: any = {
                     type: 'postgres' as const,
                     host: configService.get('database.host'),
@@ -26,9 +26,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
                     logging: false,
                     logger: 'advanced-console',
                     maxQueryExecutionTime: 1000,
-                    ssl: true,
+                    ssl: configService.get('database.ssl'),
                     extra: {
-                        ssl: true,
+                        ssl: configService.get('database.ssl'),
                         // Connection pool
                         max: 20,                        // was unset (defaulted to ~10); 20 handles burst traffic
                         min: 2,                         // keep 2 warm connections idle at all times

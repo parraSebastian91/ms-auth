@@ -4,7 +4,7 @@ export default () => ({
     port: parseInt(process.env.PORT, 10),
     ttlAuthCode: parseInt(process.env.TTL_AUTH_CODE ?? '60', 10) * 1000, // 1 minutos por defecto
     ttlSession: parseInt(process.env.TTL_SESSION ?? '3600', 10) * 1000, // 1 hora por defecto
-    ttlRefreshSession: parseInt(process.env.TTL_REFRESH_SESSION ?? '86400', 10) * 1000, // 1 día por defecto
+    ttlRefreshSession: parseInt(process.env.JWT_REFRESH_EXPIRES_IN ?? '86400', 10) * 1000, // 1 día por defecto
   },
   database: {
     type: 'postgres',
@@ -14,6 +14,7 @@ export default () => ({
     username: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
     schema: process.env.DATABASE_SCHEMA,
+    ssl: process.env.DATABASE_SSL === 'true',
   },
   redis: {
     host: process.env.REDIS_HOST ,

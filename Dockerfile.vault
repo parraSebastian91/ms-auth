@@ -1,7 +1,8 @@
 # ============================================
-# Dockerfile - Production (Multi-stage)
+# Dockerfile - Production con Vault Integration
 # ============================================
-# Uso: docker build -t sebaondocker/seis-core-service:latest .
+# Build: docker build -t sebaondocker/seis-auth-service:vault .
+# Push:  docker push sebaondocker/seis-auth-service:vault
 
 # ============================================
 # Stage 1: Dependencies
@@ -16,7 +17,6 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar dependencias de producción
-# Si existe package-lock.json usa npm ci, sino npm install
 RUN if [ -f package-lock.json ]; then \
         npm ci --omit=dev --ignore-scripts && \
         npm cache clean --force; \
@@ -57,14 +57,16 @@ RUN npm run build && \
     npm prune --production
 
 # ============================================
-# Stage 3: Runner (Imagen final)
+# Stage 3: Runner con Vault Integration
 # ============================================
 FROM node:20-alpine AS runner
 
-# Instalar solo lo esencial
+# Instalar dependencias + Vault tools
 RUN apk add --no-cache \
     libc6-compat \
     curl \
+    jq \
+    bash \
     dumb-init
 
 # Crear usuario no-root
@@ -79,8 +81,20 @@ COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 # Copiar build compilado
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
-# Copiar package.json (necesario para start:prod)
+# Copiar package.json
 COPY --chown=nestjs:nodejs package.json ./
+
+# Copiar configuración (si existe)
+COPY --chown=nestjs:nodejs config ./config
+
+# ============================================
+# VAULT INTEGRATION
+# ============================================
+
+# Copiar entrypoint Vault (antes de cambiar a nestjs)
+COPY entrypoint-with-vault.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && \
+    chown nestjs:nodejs /entrypoint.sh
 
 # Cambiar a usuario no-root
 USER nestjs
@@ -89,11 +103,14 @@ USER nestjs
 EXPOSE 3001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3001/health || exit 1
 
-# Usar dumb-init para manejo correcto de señales
-ENTRYPOINT ["dumb-init", "--"]
+# ============================================
+# ENTRYPOINT CON VAULT
+# ============================================
+# El entrypoint carga secrets de Vault antes de iniciar la app
+ENTRYPOINT ["/entrypoint.sh"]
 
-# Comando de producción
-CMD ["node", "dist/main"]
+# Comando original (ejecutado por entrypoint)
+CMD ["dumb-init", "--", "node", "dist/src/main.js"]

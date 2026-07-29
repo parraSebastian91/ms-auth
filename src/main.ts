@@ -29,7 +29,7 @@ async function preloadVaultToEnv() {
 
   for (const path of paths) {
     try {
-      const res = await client.read(`secret/data/${SECRETS[path]}`);
+      const res = await client.read(`/secret/data/${SECRETS[path]}`);
       const data = res.data.data;
       for (const [k, v] of Object.entries(data)) {
         const envKey = String(k).toUpperCase();
@@ -44,14 +44,14 @@ async function preloadVaultToEnv() {
 }
 
 async function bootstrap() {
-  await preloadVaultToEnv();
+  // await preloadVaultToEnv();
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser());
   app.getHttpAdapter().getInstance().set('trust proxy', true);
   // Deshabilitar CORS completamente
 
-  const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4201';
+  const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
   const isProd = process.env.NODE_ENV === 'production';
 
   app.enableCors({
@@ -60,7 +60,6 @@ async function bootstrap() {
     exposedHeaders: ['Set-Cookie', 'x-request-id'],
     allowedHeaders: ['Content-Type', 'Origin', 'Accept', 'Authorization', 'x-request-id'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-
   });
 
   const redisUrl = `redis://${process.env.REDIS_HOST || 'seis_erp_redis'}:${process.env.REDIS_PORT || 6379}`;
@@ -69,32 +68,32 @@ async function bootstrap() {
     url: redisUrl
   });
 
-  redisClient.on('error', (err) => console.error('Redis Client Error', err));
+  // redisClient.on('error', (err) => console.error('Redis Client Error', err));
 
-  try {
-    await redisClient.connect();
-    console.log(`✅ Conectado a Redis para sesisones en: ${redisUrl}`);
-  } catch (error) {
-    console.error('❌ Error conectando a Redis:', error);
-    throw error; // Detener si Redis no está disponible
-  }
+  // try {
+  //   await redisClient.connect();
+  //   console.log(`✅ Conectado a Redis para sesisones en: ${redisUrl}`);
+  // } catch (error) {
+  //   console.error('❌ Error conectando a Redis:', error);
+  //   throw error; // Detener si Redis no está disponible
+  // }
 
   app.use(
     session({
       store: new RedisStore({
         client: redisClient,
-        prefix: 'sess:',
-        ttl: 36000 // TTL en segundos (1 hora)
+        prefix: process.env.PREFIX_SESSION,
+        ttl: process.env.TTL_SESSION,
       }),
       name: 'auth.session',
-      secret: process.env.SECRET_SESSION || 'default_secret',
+      secret: process.env.SECRET_SESSION,
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
         secure: isProd ? 'auto' : false,
         sameSite: 'lax',
-        maxAge: 3600000,
+        maxAge: Number(process.env.TTL_COOKIE_SESSION),
         path: '/',
       },
     })
@@ -108,8 +107,8 @@ async function bootstrap() {
   //   next();
   // });
 
-  await app.listen(process.env.PORT ?? 3000).then(() => {
-    console.log(`Application is running on: ${process.env.PORT ?? 3000}`);
+  await app.listen(process.env.PORT).then(() => {
+    console.log(`Application is running on: ${process.env.PORT}`);
   });
 }
 bootstrap();

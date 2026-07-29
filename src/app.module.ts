@@ -16,7 +16,7 @@ import { CacheRepositoryAdapter } from './infrastructure/adapter/cacheRepository
     ConfigModule.forRoot({
       load: [configurations],
       isGlobal: true,
-      envFilePath: ['.env.container']
+      envFilePath: ['.env']
     }),
     CoreModule.register({
       modules: [InfraestructureModule],
