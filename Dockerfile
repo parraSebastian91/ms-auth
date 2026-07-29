@@ -86,11 +86,11 @@ COPY --chown=nestjs:nodejs package.json ./
 USER nestjs
 
 # Exponer puerto
-EXPOSE 3001
+EXPOSE 2000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3001/health || exit 1
+    CMD curl -f http://localhost:2000/health || exit 1
 
 # Usar dumb-init para manejo correcto de señales
 ENTRYPOINT ["dumb-init", "--"]

@@ -66,6 +66,7 @@ load_session_env(){
     export SECRET_SESSION=$(vault_get "$path" "SECRET_SESSION")
     export TTL_COOKIE_SESSION=$(vault_get "$path" "TTL_COOKIE_SESSION")
     export TTL_SESSION=$(vault_get "$path" "TTL_SESSION")
+    export TTL_AUTH_CODE=$(vault_get "$path" "TTL_AUTH_CODE")
 }
 
 load_storage_minio(){
