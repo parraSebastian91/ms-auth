@@ -24,6 +24,9 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
         enabled: true,
       },
       path: '/metrics',
+      defaultLabels: {
+        app: 'ms-auth',
+      },
     }),
     CoreModule.register({
       modules: [InfraestructureModule],

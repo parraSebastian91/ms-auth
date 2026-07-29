@@ -4,9 +4,13 @@ import { ValidationPipe } from './infrastructure/http/pipes/validation.pipe';
 
 import * as session from 'express-session';
 import { createClient } from 'redis';
+import { register } from 'prom-client';
 
 const { RedisStore } = require('connect-redis');
 const cookieParser = require('cookie-parser');
+
+// Limpiar registry de Prometheus para evitar "metric already registered"
+register.clear();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
