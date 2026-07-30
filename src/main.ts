@@ -9,10 +9,9 @@ import { register } from 'prom-client';
 const { RedisStore } = require('connect-redis');
 const cookieParser = require('cookie-parser');
 
-// Limpiar registry de Prometheus para evitar "metric already registered"
-register.clear();
 
 async function bootstrap() {
+  register.clear();
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser());

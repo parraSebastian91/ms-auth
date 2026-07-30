@@ -1,45 +1,53 @@
 # ============================================
-# Dockerfile - Production (Multi-stage)
+# Dockerfile - Production con Vault Integration (pnpm)
 # ============================================
-# Uso: docker build -t sebaondocker/seis-core-service:latest .
+# Build: docker build -t sebaondocker/seis-auth-service:vault .
+# Push:  docker push sebaondocker/seis-auth-service:vault
+
+# Configuración global para habilitar pnpm via Corepack en Alpine
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # ============================================
 # Stage 1: Dependencies
 # ============================================
-FROM node:20-alpine AS deps
+FROM base AS deps
 
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Copiar solo package files para cachear dependencias
-COPY package*.json ./
+# Copiar archivos de pnpm para cachear dependencias
+COPY package.json pnpm-lock.yaml* ./
 
-# Instalar dependencias de producción
-# Si existe package-lock.json usa npm ci, sino npm install
-RUN if [ -f package-lock.json ]; then \
-        npm ci --omit=dev --ignore-scripts && \
-        npm cache clean --force; \
+# Instalar dependencias de producción usando caché montado
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    if [ -f pnpm-lock.yaml ]; then \
+        pnpm i --frozen-lockfile --prod --ignore-scripts; \
     else \
-        npm install --production --ignore-scripts && \
-        npm cache clean --force; \
+        pnpm install --prod --ignore-scripts; \
     fi
 
 # ============================================
 # Stage 2: Builder
 # ============================================
-FROM node:20-alpine AS builder
+FROM base AS builder
 
 WORKDIR /app
 
-# Copiar package files
-COPY package*.json ./
+# Copiar archivos de pnpm
+COPY package.json pnpm-lock.yaml* ./
 
-# Instalar TODAS las dependencias (necesarias para build)
-RUN if [ -f package-lock.json ]; then \
-        npm ci; \
+# Instalar TODAS las dependencias (necesarias para build) usando el mismo caché
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    if [ -f pnpm-lock.yaml ]; then \
+        pnpm i --frozen-lockfile; \
     else \
-        npm install; \
+        pnpm install; \
     fi
 
 # Copiar archivos de configuración
@@ -53,18 +61,19 @@ COPY config ./config
 COPY src ./src
 
 # Build de la aplicación
-RUN npm run build && \
-    npm prune --production
+RUN pnpm run build
 
 # ============================================
-# Stage 3: Runner (Imagen final)
+# Stage 3: Runner con Vault Integration
 # ============================================
 FROM node:20-alpine AS runner
 
-# Instalar solo lo esencial
+# Instalar dependencias + Vault tools (No requiere pnpm aquí)
 RUN apk add --no-cache \
     libc6-compat \
     curl \
+    jq \
+    bash \
     dumb-init
 
 # Crear usuario no-root
@@ -73,14 +82,26 @@ RUN addgroup -g 1001 nodejs && \
 
 WORKDIR /app
 
-# Copiar node_modules de producción
+# Copiar node_modules de producción desde la etapa 'deps'
 COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 # Copiar build compilado
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
-# Copiar package.json (necesario para start:prod)
+# Copiar package.json
 COPY --chown=nestjs:nodejs package.json ./
+
+# Copiar configuración (si existe)
+COPY --chown=nestjs:nodejs config ./config
+
+# ============================================
+# VAULT INTEGRATION
+# ============================================
+
+# Copiar entrypoint Vault (antes de cambiar a nestjs)
+COPY entrypoint-with-vault.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && \
+    chown nestjs:nodejs /entrypoint.sh
 
 # Cambiar a usuario no-root
 USER nestjs
@@ -92,8 +113,10 @@ EXPOSE 2000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:2000/health || exit 1
 
-# Usar dumb-init para manejo correcto de señales
-ENTRYPOINT ["dumb-init", "--"]
+# ============================================
+# ENTRYPOINT CON VAULT
+# ============================================
+ENTRYPOINT ["/entrypoint.sh"]
 
-# Comando de producción
-CMD ["node", "dist/main"]
+# Comando original (ejecutado por entrypoint)
+CMD ["dumb-init", "--", "node", "dist/src/main.js"]

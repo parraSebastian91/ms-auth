@@ -20,7 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "docker:logs": "docker compose -f ./../../docker-compose-app-services.yml logs -f auth-service",
-    "docker:build": "docker build -f ./Dockerfile.vault -t sebaondocker/seis-auth-service:latest .",
+    "docker:build": "docker build --no-cache -t sebaondocker/seis-auth-service:latest .",
     "docker:publish": "docker push sebaondocker/seis-auth-service:latest"
   },
   "dependencies": {
