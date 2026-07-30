@@ -13,6 +13,9 @@ import {
       defaultMetrics: {
         enabled: true,
       },
+      defaultLabels: {
+        app: 'ms-auth',
+      },
     }),
   ],
   providers: [

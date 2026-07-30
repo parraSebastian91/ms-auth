@@ -9,7 +9,7 @@ import { RolRepositoryAdapter } from './infrastructure/adapter/rolRepository.ada
 import { RefreshSessionRepositoryAdapter } from './infrastructure/adapter/RefresshSessionRepository.adapter';
 import { PasswordResetRepositoryAdapter } from './infrastructure/adapter/passwordResetRepository.adapter';
 import { CacheRepositoryAdapter } from './infrastructure/adapter/cacheRepository.adapter';
-import { PrometheusModule } from '@willsoto/nestjs-prometheus';
+import { MetricsModule } from './infrastructure/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -19,15 +19,7 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
       isGlobal: true,
       envFilePath: ['.env']
     }),
-    PrometheusModule.register({
-      defaultMetrics: {
-        enabled: true,
-      },
-      path: '/metrics',
-      defaultLabels: {
-        app: 'ms-auth',
-      },
-    }),
+    MetricsModule,
     CoreModule.register({
       modules: [InfraestructureModule],
       adapters: {
