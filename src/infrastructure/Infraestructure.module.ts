@@ -29,7 +29,6 @@ import {
   ConfigService,
   ConfigModule as NestConfigModule,
 } from '@nestjs/config';
-import { SecretsModule } from './secrets/secrets.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -41,7 +40,6 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
 @Module({
   imports: [
     DatabaseModule,
-    SecretsModule,
     HttpServerModule,
     MetricsModule,
     ConfigModule,
@@ -66,17 +64,22 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
-        const redisHost = configService.get<string>('redis.host', 'seis_erp_redis');
+        const redisHost = configService.get<string>(
+          'redis.host',
+          'seis_erp_redis',
+        );
         const redisPort = configService.get<number>('redis.port', 6379);
         const redisTTL = configService.get<number>('redis.ttl', 3600) * 1000; // Convertir a milisegundos
-        console.log(`Configuración de Redis: host=${redisHost}, port=${redisPort}, ttl=${redisTTL}ms`);
+        console.log(
+          `Configuración de Redis: host=${redisHost}, port=${redisPort}, ttl=${redisTTL}ms`,
+        );
         return {
           isGlobal: true,
           store: RedisStore,
           host: redisHost,
           port: redisPort,
           ttl: redisTTL, // 1 hora por defecto
-        }
+        };
       },
     }),
   ],
@@ -94,7 +97,6 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
     ContactoRepositoryAdapter,
     RolRepositoryAdapter,
     RefreshSessionRepositoryAdapter,
-    SecretsModule,
     MetricsModule,
     PasswordResetRepositoryAdapter,
     CacheRepositoryAdapter,

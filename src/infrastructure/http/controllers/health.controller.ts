@@ -6,7 +6,6 @@ import {
   MemoryHealthIndicator,
   DiskHealthIndicator,
 } from '@nestjs/terminus';
-import { VaultService } from 'src/infrastructure/secrets/vault.service';
 import { Public } from '../decorators/public.decorator';
 
 @Public()
@@ -17,7 +16,6 @@ export class HealthController {
     private db: TypeOrmHealthIndicator,
     private memory: MemoryHealthIndicator,
     private disk: DiskHealthIndicator,
-    private vaultService: VaultService,
   ) {}
 
   @Get()
@@ -26,29 +24,19 @@ export class HealthController {
     return this.health.check([
       // Database health
       () => this.db.pingCheck('database'),
-      
+
       // Memory health (heap no debe superar 150MB)
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
-      
+
       // RSS memory (no debe superar 300MB)
       () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024),
-      
+
       // Disk health (debe tener al menos 90% libre)
       () =>
         this.disk.checkStorage('storage', {
           path: '/',
           thresholdPercent: 0.9,
         }),
-      
-      // Vault health
-      async () => {
-        const isAvailable = this.vaultService.isAvailable();
-        return {
-          vault: {
-            status: isAvailable ? 'up' : 'down',
-          },
-        };
-      },
     ]);
   }
 

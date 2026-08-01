@@ -10,7 +10,6 @@ import { TerminusModule } from '@nestjs/terminus';
 import { AuthController } from './controllers/auth.controller';
 import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
-import { SecretsModule } from '../secrets/secrets.module';
 import { HttpModule } from '@nestjs/axios';
 import { LoggerInterceptor } from './middleware/logger.interceptor';
 import { RegistroController } from './controllers/registro.controller';
@@ -18,13 +17,11 @@ import { RegistroController } from './controllers/registro.controller';
 @Module({
   imports: [
     TerminusModule,
-    SecretsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('jwtConfig.access_secret'),
+        secret: configService.get<string>('jwtConfig.access_secret'),
         signOptions: { expiresIn: '1h' },
       }),
     }),
