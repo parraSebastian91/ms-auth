@@ -185,11 +185,11 @@ export class AuthAplicationService {
             return 0;
         }
         const decodedJWT: any = this.jwtService.decode(accessToken);
-        this.logger.log(`CERRANDO SESSION UUID: ${decodedJWT.userUuid} | deviceType: ${decodedJWT.typeDevice}`);
         if (!decodedJWT) {
-            this.logger.warn(`Failed to decode JWT for sessionUuid: ${decodedJWT.sessionUuid}`);
+            this.logger.warn(`Failed to decode JWT for sessionId: ${sessionId}`);
             return 0;
         }
+        this.logger.log(`CERRANDO SESSION UUID: ${decodedJWT.userUuid} | deviceType: ${decodedJWT.typeDevice}`);
         const response = Promise.all([
             this.refreshSessionRepo.revokeUserSessions(decodedJWT.sessionUuid, decodedJWT.typeDevice),
             this.cacheRepository.deleteAccessToken(sessionId)
