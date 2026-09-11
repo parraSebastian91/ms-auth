@@ -32,8 +32,22 @@ export class AuthGuard implements CanActivate {
 
   }
 
+  /** Extrae el sessionId de la cookie auth.session, lanzando 401 limpio
+   *  si la cookie no vino en vez de romper con un TypeError. Mismo patrón
+   *  ya usado en bff_seis_app/.../guards/auth.guard.ts. */
   private async extractSession(request: Request): Promise<string> {
-    console.log('Extracting session from request cookies:', request.cookies['auth.session']);
-    return request.cookies['auth.session'].split(':')[1].split('.')[0];;
+    const rawSession = request.cookies?.['auth.session'];
+    if (!rawSession || typeof rawSession !== 'string') {
+      this.logger.warn('Cookie auth.session ausente o inválida');
+      throw new UnauthorizedException('No session cookie found');
+    }
+
+    const sessionId = rawSession.split(':')[1]?.split('.')[0];
+    if (!sessionId) {
+      this.logger.warn('No fue posible extraer sessionId desde auth.session');
+      throw new UnauthorizedException('Invalid session cookie format');
+    }
+
+    return sessionId;
   }
 }

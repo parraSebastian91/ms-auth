@@ -207,16 +207,27 @@ export class AuthController {
     @Res() res: Response
   ) {
     const requestId = this.getRequestId(req);
-    this.logger.log(`[LOGOUT] INIT requestId=${requestId} sessionId=${session.id}`);
-    await this.authUseCase.ExecuteLogout(session.id)
+    const sessionId = session.id;
+    this.logger.log(`[LOGOUT] INIT requestId=${requestId} sessionId=${sessionId}`);
+    await this.authUseCase.ExecuteLogout(sessionId)
     session.accessToken = null;
     session.refreshToken = null;
-    session.destroy((err: any) => {
-      if (err) {
-        this.logger.error(`[LOGOUT] SESSION_DESTROY_ERROR requestId=${requestId} sessionId=${session.id}`, err?.stack);
-        return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error durante logout', null));
-      }
-    });
+
+    // ✅ ESPERAR el destroy antes de responder — evita mandar dos respuestas
+    // (ERR_HTTP_HEADERS_SENT) si destroy falla después de que ya hubiéramos
+    // respondido, igual que ya se hace con session.save() en login/callback.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        session.destroy((err: any) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    } catch (err: any) {
+      this.logger.error(`[LOGOUT] SESSION_DESTROY_ERROR requestId=${requestId} sessionId=${sessionId}`, err?.stack);
+      return res.status(NestHttpStatus.INTERNAL_SERVER_ERROR).json(new ApiResponse(NestHttpStatus.INTERNAL_SERVER_ERROR, 'Error durante logout', null));
+    }
+
     // Eliminar cookie de refresh
     res.clearCookie('auth.refresh', this.getRefreshCookieOptions(req, 0));
 
@@ -228,7 +239,7 @@ export class AuthController {
       path: '/',
     });
 
-    this.logger.log(`[LOGOUT] SUCCESS requestId=${requestId} sessionId=${session.id}`);
+    this.logger.log(`[LOGOUT] SUCCESS requestId=${requestId} sessionId=${sessionId}`);
     return res.status(NestHttpStatus.OK).json(new ApiResponse(NestHttpStatus.OK, 'Logout exitoso', null));
   }
 
