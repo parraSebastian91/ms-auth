@@ -4,7 +4,7 @@ https://docs.nestjs.com/modules
 
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/databaseConfig.module';
-import { HttpServerModule } from './http-server/http-server.module';
+import { HttpServerModule } from './http/http.module';
 import { UsuarioRepositoryAdapter } from './adapter/usuarioRepository.adapter';
 import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter';
 import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
@@ -24,50 +24,80 @@ import { UsuarioEntity } from './database/entities/usuario.entity';
 import { FuncionalidadEntity } from './database/entities/funcionalidad.entity';
 import { RefreshSessionEntity } from './database/entities/RefreshSession.entity';
 import { RefreshSessionRepositoryAdapter } from './adapter/RefresshSessionRepository.adapter';
-import { ConfigModule as NestConfigModule } from '@nestjs/config';
-import { SecretsModule } from './secrets/secrets.module';
+import {
+  ConfigModule,
+  ConfigService,
+  ConfigModule as NestConfigModule,
+} from '@nestjs/config';
 import { MetricsModule } from './metrics/metrics.module';
+import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
+import { CacheModule } from '@nestjs/cache-manager';
+import { RedisStore } from 'connect-redis';
+import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
+import { ConsoleEmailAdapter } from './adapter/consoleEmail.adapter';
+import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.interface';
 
 @Module({
-    imports: [
-        DatabaseModule,
-        SecretsModule,
-        HttpServerModule,
-        MetricsModule,
-        TypeOrmModule.forFeature([
-            ContactoEntity,
-            CuentaBancariaEntity,
-            ModuloEntity,
-            OrganizacionEntity,
-            OrganizacionContactoEntity,
-            OrganizacionSistemaEntity,
-            PermisoEntity,
-            RolEntity,
-            RolModuloPermisoEntity,
-            SistemaEntity,
-            TipoContactoEntity,
-            UsuarioEntity,
-            FuncionalidadEntity,
-            RefreshSessionEntity
-        ]),
-        NestConfigModule.forRoot({
-            isGlobal: true,
-            envFilePath: ['.env.dev', '.env'],
-        }),
-    ],
-    providers: [
-        UsuarioRepositoryAdapter,
-        ContactoRepositoryAdapter,
-        RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter
-    ],
-    exports: [
-        UsuarioRepositoryAdapter,
-        ContactoRepositoryAdapter,
-        RolRepositoryAdapter,
-        RefreshSessionRepositoryAdapter,
-        SecretsModule,
-        MetricsModule,
-    ],
+  imports: [
+    DatabaseModule,
+    HttpServerModule,
+    MetricsModule,
+    ConfigModule,
+    TypeOrmModule.forFeature([
+      ContactoEntity,
+      CuentaBancariaEntity,
+      ModuloEntity,
+      OrganizacionEntity,
+      OrganizacionContactoEntity,
+      OrganizacionSistemaEntity,
+      PermisoEntity,
+      RolEntity,
+      RolModuloPermisoEntity,
+      SistemaEntity,
+      TipoContactoEntity,
+      UsuarioEntity,
+      FuncionalidadEntity,
+      RefreshSessionEntity,
+    ]),
+    CacheModule.register({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const redisHost = configService.get<string>(
+          'redis.host',
+          'seis_erp_redis',
+        );
+        const redisPort = configService.get<number>('redis.port', 6379);
+        const redisTTL = configService.get<number>('redis.ttl', 3600) * 1000; 
+        return {
+          isGlobal: true,
+          store: RedisStore,
+          host: redisHost,
+          port: redisPort,
+          ttl: redisTTL, // 1 hora por defecto
+        };
+      },
+    }),
+  ],
+  providers: [
+    UsuarioRepositoryAdapter,
+    ContactoRepositoryAdapter,
+    RolRepositoryAdapter,
+    RefreshSessionRepositoryAdapter,
+    PasswordResetRepositoryAdapter,
+    CacheRepositoryAdapter,
+    { provide: EMAIL_SERVICE, useClass: ConsoleEmailAdapter },
+  ],
+  exports: [
+    UsuarioRepositoryAdapter,
+    ContactoRepositoryAdapter,
+    RolRepositoryAdapter,
+    RefreshSessionRepositoryAdapter,
+    MetricsModule,
+    PasswordResetRepositoryAdapter,
+    CacheRepositoryAdapter,
+    EMAIL_SERVICE,
+  ],
 })
-export class InfraestructureModule { }
+export class InfraestructureModule {}

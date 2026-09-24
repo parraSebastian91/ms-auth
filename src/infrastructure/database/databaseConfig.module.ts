@@ -1,50 +1,50 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { VaultService } from '../secrets/vault.service';
-import { SecretsModule } from '../secrets/secrets.module';
-
-
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
-    imports: [
-        SecretsModule,
-        TypeOrmModule.forRootAsync({
-            imports: [SecretsModule],
-            useFactory: async (vaultService: VaultService) => {
-                const dbSecrets = vaultService.getAllSecrets('database');
-                console.log(dbSecrets);
-                return {
-                    type: 'postgres',
-                    host: dbSecrets.DATABASE_HOST || process.env.DATABASE_HOST || 'localhost',
-                    port:   parseInt(dbSecrets.DATABASE_PORT, 10) ||parseInt(process.env.DATABASE_PORT, 10) || 5432,
-                    username: dbSecrets.DATABASE_USER || process.env.DATABASE_USER || 'desarrollo',
-                    password: dbSecrets.DATABASE_PASSWORD || process.env.DATABASE_PASSWORD || 'desarrollo123',
-                    database: dbSecrets.DATABASE_NAME || process.env.DATABASE_NAME || 'core_erp',
-                    schema: dbSecrets.DATABASE_SCHEMA || process.env.DATABASE_SCHEMA || 'core',
-                    entities: [__dirname + '/entities/*.entity{.ts,.js}'],
-                    synchronize: false,  // ← NO usar true en producción
-                    // ✅ ACTIVAR LOGGING COMPLETO
-                    logging: true,  // O más específico:  ['query', 'error', 'schema', 'warn', 'info', 'log']
-                    logger: 'advanced-console',  // O 'debug', 'simple-console'
-
-                    // ✅ Ver todas las queries
-                    maxQueryExecutionTime: 1000,
-                    // ✅ Opciones adicionales de debugging
-                    extra: {
-                        // Ver detalles de conexión
-                        connectionTimeoutMillis: 5000,
-                        query_timeout: 10000,
-                        statement_timeout: 10000,
-                    },
-                }
-            },
-            inject: [VaultService],
-        })
-    ],
-    providers: [],
-    exports: [],
+  imports: [
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        console.log(configService.get('database'));
+        let dbConfig: any = {
+          type: 'postgres' as const,
+          host: configService.get('database.host'),
+          port: configService.get('database.port'),
+          username: configService.get('database.username'),
+          password: configService.get('database.password'),
+          database: configService.get('database.database'),
+          schema: configService.get('database.schema'),
+          entities: [__dirname + '/entities/*.entity{.ts,.js}'],
+          synchronize: false,
+          logging: false,
+          logger: 'advanced-console',
+          maxQueryExecutionTime: 1000,
+          ssl: configService.get('database.ssl'),
+          extra: {
+            ssl: configService.get('database.ssl'),
+            // Connection pool
+            max: 20, // was unset (defaulted to ~10); 20 handles burst traffic
+            min: 2, // keep 2 warm connections idle at all times
+            idleTimeoutMillis: 30_000, // release idle connections after 30s
+            connectionTimeoutMillis: 3_000, // fail fast if pool is full (was 5000)
+            // Keep TCP connections alive so reconnect latency doesn't spike queries
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10_000,
+            query_timeout: 10_000,
+            statement_timeout: 10_000,
+          },
+        };
+        return dbConfig;
+      },
+    }),
+  ],
+  providers: [],
+  exports: [],
 })
 export class DatabaseModule {
-    // This module can be used to configure database specific settings or providers
-    // if needed in the future.
+  // This module can be used to configure database specific settings or providers
+  // if needed in the future.
 }

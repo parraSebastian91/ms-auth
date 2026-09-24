@@ -1,39 +1,92 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from './infrastructure/http-server/pipes/validation.pipe';
-const session = require('express-session');
+import { ValidationPipe } from './infrastructure/http/pipes/validation.pipe';
+
+import * as session from 'express-session';
+import { createClient } from 'redis';
+import { register } from 'prom-client';
+
+const { RedisStore } = require('connect-redis');
+const cookieParser = require('cookie-parser');
+
 
 async function bootstrap() {
+  register.clear();
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
+  app.use(cookieParser());
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
   // Deshabilitar CORS completamente
-  app.enableCors();
+
+  const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4200';
+  const isProd = process.env.NODE_ENV === 'production';
+
+  app.enableCors({
+    origin: [
+      'http://localhost:4200',
+      'http://127.0.0.1:4200',
+      'http://192.168.3.10:4200', // PC-Dev
+      FRONTEND_ORIGIN,
+    ].filter(Boolean),
+    credentials: true,
+    exposedHeaders: ['Set-Cookie', 'x-request-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Origin',
+      'Accept',
+      'Authorization',
+      'x-request-id',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  });
+
+  const redisUrl = `redis://${process.env.REDIS_HOST || 'seis_erp_redis'}:${process.env.REDIS_PORT || 6379}`;
+  // Cliente Redis para sesiones
+  const redisClient = createClient({
+    url: redisUrl,
+  });
+
+  // redisClient.on('error', (err) => console.error('Redis Client Error', err));
+
+  // try {
+  //   await redisClient.connect();
+  //   console.log(`✅ Conectado a Redis para sesisones en: ${redisUrl}`);
+  // } catch (error) {
+  //   console.error('❌ Error conectando a Redis:', error);
+  //   throw error; // Detener si Redis no está disponible
+  // }
 
   app.use(
     session({
-      secret: process.env.SECRET_SESSION || 'default_secret',
+      store: new RedisStore({
+        client: redisClient,
+        prefix: process.env.PREFIX_SESSION,
+        ttl: process.env.TTL_SESSION,
+      }),
+      name: 'auth.session',
+      secret: process.env.SECRET_SESSION,
       resave: false,
       saveUninitialized: false,
       cookie: {
-        httpOnly: true, // Protege contra XSS
-        //secure: true,   // Solo sobre HTTPS
-        sameSite: 'lax', // Protege contra CSRF
-        maxAge: 3600000, // 1 hora
+        httpOnly: true,
+        secure: isProd ? 'auto' : false,
+        sameSite: 'lax',
+        maxAge: Number(process.env.TTL_COOKIE_SESSION),
+        path: '/',
       },
-    })
-  )
-  app.getHttpAdapter().getInstance().set('trust proxy', true); // o true si está detrás de un proxy
+    }),
+  );
 
-  app.use((req, res, next) => {
-    console.log('path:', req.path);
-    console.log('X-Real-IP:', req.headers['x-real-ip']);
-    console.log('X-Forwarded-For:', req.headers['x-forwarded-for']);
-    console.log('IP remota:', req.ip);
-    next();
-  });
+  // app.use((req, res, next) => {
+  //   console.log('path:', req.path);
+  //   console.log('X-Real-IP:', req.headers['x-real-ip']);
+  //   console.log('X-Forwarded-For:', req.headers['x-forwarded-for']);
+  //   console.log('IP remota:', req.ip);
+  //   next();
+  // });
 
-  await app.listen(process.env.PORT ?? 3000).then(() => {
-    console.log(`Application is running on: ${process.env.PORT ?? 3000}`);
+  await app.listen(process.env.PORT).then(() => {
+    console.log(`Application is running on: ${process.env.PORT}`);
   });
 }
 bootstrap();
