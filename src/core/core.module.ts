@@ -2,13 +2,12 @@
 https://docs.nestjs.com/modules
 */
 
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DynamicModule, Module, Type } from '@nestjs/common';
-import { Cache } from 'cache-manager';
 import { AuthAplicationService } from './aplication/service/auth.service';
 import { AuthUseCase } from './aplication/useCase/auth/auth.usecase';
+import { CacheModule } from '@nestjs/cache-manager';
 import { IUsuarioRepository } from './domain/puertos/outbound/iUsuarioRepository.interface';
 import { IContactoRepository } from './domain/puertos/outbound/iContactoRepository.interface';
 import { IRolRepository } from './domain/puertos/outbound/iRolRepository.interface';
@@ -142,6 +141,7 @@ export class CoreModule {
             module: CoreModule,
             global: true,
             imports: [
+                CacheModule.register(),
                 ...modules,
             ],
             providers: [
