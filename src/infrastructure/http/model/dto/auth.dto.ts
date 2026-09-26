@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty } from "class-validator";
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export enum DeviceType {
   WEB = 'WEB',
@@ -7,7 +7,8 @@ export enum DeviceType {
   POSTMAN = 'POSTMAN',
 }
 
-export class LoginDto {
+/** POST /security/authorize */
+export class AuthorizeRequestDto {
   @IsNotEmpty({ message: "El nombre de usuario es obligatorio" })
   username: string;
   @IsNotEmpty({ message: "La contraseña es obligatoria" })
@@ -21,7 +22,8 @@ export class LoginDto {
   CorrelationId: string;
 }
 
-export class CallBackDTO {
+/** POST /security/token */
+export class TokenRequestDto {
   @IsNotEmpty({ message: "El código es obligatorio" })
   code: string;
 
@@ -35,11 +37,9 @@ export class CallBackDTO {
   cid: string
 }
 
-export class RefreshDto {
-  @IsNotEmpty({ message: "El token es obligatorio" })
-  refresh_token: string;
-  @IsNotEmpty({ message: "El token es obligatorio" })
-  userId: string;
-  @IsNotEmpty({ message: "El tipo de dispositivo es obligatorio" })
-  typeDevice: string;
+/** POST /security/session/refresh */
+export class RefreshSessionRequestDto {
+  @IsOptional()
+  @IsString()
+  typeDevice?: string;
 }

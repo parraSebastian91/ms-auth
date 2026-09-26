@@ -1,5 +1,5 @@
-import { UpdateContactoData, UserProfileModel } from '../../../core/domain/model/userProfile.model';
-import { ValidationError } from '../../../core/domain/errors/validation.error';
+import { UpdateContactoData, UserProfileModel } from '../../../../core/domain/model/userProfile.model';
+import { ValidationError } from '../../../../core/domain/errors/validation.error';
 
 /** Respuesta de GET/PUT /usuario/profile/:uuid (mismo contrato que tenía ms-core). */
 export class UserProfileDTO {

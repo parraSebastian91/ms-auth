@@ -129,7 +129,7 @@ Liveness probe con métricas de proceso.
 
 ---
 
-#### `POST /security/authenticate`
+#### `POST /security/authorize`
 
 **Paso 1 del flujo PKCE.** Valida credenciales y retorna las URLs de redirección para completar el flujo de autorización.
 
@@ -183,7 +183,7 @@ Liveness probe con métricas de proceso.
 
 ---
 
-#### `POST /security/callback`
+#### `POST /security/token`
 
 **Paso 2 del flujo PKCE.** Intercambia el `code` de autorización por tokens. Crea la sesión autenticada y establece las cookies `auth.session` y `auth.refresh`.
 
@@ -407,11 +407,11 @@ Ejecuta el cambio de contraseña usando el token válido.
    code_verifier = random(43-128 chars)
    code_challenge = base64url(sha256(code_verifier))
 
-2. POST /security/authenticate
+2. POST /security/authorize
    Body: { username, password, code_challenge, typeDevice }
    ← Respuesta: { data: [redirect_url] }
 
-3. POST /security/callback
+3. POST /security/token
    Body: { code: <extraído de redirect_url>, codeVerifier, typeDevice }
    ← Cookies: auth.session + auth.refresh
    ← Body: { message: "Autenticación exitosa" }
@@ -439,8 +439,8 @@ Ejecuta el cambio de contraseña usando el token válido.
 | `GET` | `/health/ready` | No | Readiness probe |
 | `GET` | `/health/live` | No | Liveness probe + métricas de proceso |
 | `ALL` | `/security/session/test` | No | Diagnóstico de cookies (dev only) |
-| `POST` | `/security/authenticate` | No | Paso 1 PKCE: validar credenciales |
-| `POST` | `/security/callback` | No | Paso 2 PKCE: canjear code → sesión + cookies |
+| `POST` | `/security/authorize` | No | Paso 1 PKCE: validar credenciales |
+| `POST` | `/security/token` | No | Paso 2 PKCE: canjear code → sesión + cookies |
 | `POST` | `/security/session/refresh` | Cookie `auth.refresh` | Renovar sesión expirada |
 | `GET` | `/security/logout` | Cookie `auth.session` | Destruir sesión y limpiar cookies |
 | `POST` | `/security/password-reset/request` | No | Solicitar email de recuperación |
@@ -461,7 +461,7 @@ Ejecuta el cambio de contraseña usando el token válido.
 
 ## Notas para el Agente IA
 
-1. **PKCE obligatorio** — no hay endpoint de login simple. Siempre generar `code_verifier` + `code_challenge` antes de `POST /security/authenticate`.
+1. **PKCE obligatorio** — no hay endpoint de login simple. Siempre generar `code_verifier` + `code_challenge` antes de `POST /security/authorize`.
 2. **Gestión de cookies** — el agente debe persistir `auth.session` y `auth.refresh` entre llamadas. Ambas son HttpOnly y no accesibles por JS.
 3. **Sesión dura 1 hora** — implementar renovación proactiva con `POST /security/session/refresh` antes del vencimiento, usando `auth.refresh` (válido 7 días).
 4. **El BFF valida la sesión** — ms-identity emite la sesión, el BFF la verifica. El agente nunca llama a ms-identity directamente para recursos de negocio.

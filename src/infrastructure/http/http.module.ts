@@ -7,7 +7,9 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { TerminusModule } from '@nestjs/terminus';
-import { AuthController } from './controllers/auth.controller';
+import { AuthorizationController } from './controllers/authorization.controller';
+import { SessionController } from './controllers/session.controller';
+import { PasswordResetController } from './controllers/passwordReset.controller';
 import { HealthController } from './controllers/health.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { HttpModule } from '@nestjs/axios';
@@ -33,7 +35,14 @@ import { PermissionsGuard } from './guards/permissions.guard';
       maxRedirects: 5,
     }),
   ],
-  controllers: [AuthController, RegistroController, HealthController, UserProfileController],
+  controllers: [
+    AuthorizationController,
+    SessionController,
+    PasswordResetController,
+    RegistroController,
+    HealthController,
+    UserProfileController,
+  ],
   providers: [
     {
       provide: APP_INTERCEPTOR,

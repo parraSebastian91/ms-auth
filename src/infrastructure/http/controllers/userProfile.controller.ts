@@ -7,7 +7,7 @@ import { Permissions } from '../decorators/permissions.decorator';
 import { Public } from '../decorators/public.decorator';
 import { JwtAccessGuard } from '../guards/jwt-access.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
-import { toUpdateContactoData, UserProfileDTO } from '../model/userProfile.dto';
+import { toUpdateContactoData, UserProfileDTO } from '../model/dto/userProfile.dto';
 
 /**
  * Perfil de usuario (identidad + contacto). @Public() solo desactiva el guard de sesión
