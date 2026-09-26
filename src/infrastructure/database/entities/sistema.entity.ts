@@ -1,9 +1,8 @@
-import { Column, Entity, ManyToMany, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { ModuloEntity } from "./modulo.entity";
-import { OrganizacionEntity } from "./organizacion.entity";
 
 
-@Entity({ name: 'sistema' })
+@Entity({ name: 'sistema', schema: 'identity' })
 export class SistemaEntity {
 
     @PrimaryGeneratedColumn({ name: 'sistema_id' })
@@ -28,12 +27,5 @@ export class SistemaEntity {
     )
     modulos: ModuloEntity[];
 
-    @ManyToMany(() => OrganizacionEntity,
-        organizacion => organizacion.sistemas,
-        {
-            onDelete: 'NO ACTION', onUpdate: 'NO ACTION'
-
-        })
-    organicaciones: OrganizacionEntity[];
 
 }

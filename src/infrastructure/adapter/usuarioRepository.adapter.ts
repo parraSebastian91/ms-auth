@@ -89,7 +89,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
     data: RegistroUsuarioModel,
   ): Promise<{ usuarioUuid: string }> {
     const query = `
-        INSERT INTO core.usuario (usuario_uuid, username, password_hash, activo, contacto_id, created_at, updated_at) 
+        INSERT INTO identity.usuario (usuario_uuid, username, password_hash, activo, contacto_id, created_at, updated_at) 
         VALUES(gen_random_uuid(), $1, $2, false, $3, now(), now())
         returning usuario_uuid;
         `;
@@ -130,7 +130,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
 
   async marcarEmailVerificado(userUuid: string): Promise<void> {
     await this.usuarioRepository.query(
-      `UPDATE core.usuario
+      `UPDATE identity.usuario
              SET email_verificado = true, activo = true, email_verificado_at = now()
              WHERE usuario_uuid = $1`,
       [userUuid],
@@ -147,8 +147,8 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
   } | null> {
     const result = await this.usuarioRepository.query(
       `SELECT u.usuario_id, u.usuario_uuid, u.email_verificado, c.nombres
-             FROM core.usuario u
-             JOIN core.contacto c ON c.contacto_id = u.contacto_id
+             FROM identity.usuario u
+             JOIN identity.contacto c ON c.contacto_id = u.contacto_id
              WHERE c.correo = $1
              LIMIT 1`,
       [email],
@@ -166,7 +166,7 @@ export class UsuarioRepositoryAdapter implements IUsuarioRepository {
     field: string,
     value: string,
   ): Promise<{ available: boolean; message?: string }> {
-    let query = `select count(1) = 0 as available  from core.usuario u join core.contacto c on u.contacto_id  = c.contacto_id  `;
+    let query = `select count(1) = 0 as available  from identity.usuario u join identity.contacto c on u.contacto_id  = c.contacto_id  `;
     let nombreCampo = '';
     switch (field) {
       case 'username':

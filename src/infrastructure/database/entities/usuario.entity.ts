@@ -3,7 +3,7 @@ import { RolEntity } from "./rol.entity";
 import { ContactoEntity } from "./contacto.entity";
 import { RefreshSessionEntity } from "./RefreshSession.entity";
 
-@Entity({ name: 'usuario' })
+@Entity({ name: 'usuario', schema: 'identity' })
 export class UsuarioEntity {
 
     @PrimaryGeneratedColumn({ type: "bigint", name: 'usuario_id' })
@@ -38,6 +38,7 @@ export class UsuarioEntity {
     @ManyToMany(() => RolEntity, rol => rol.usuarios)
     @JoinTable({
             name: 'usuario_rol',
+            schema: 'identity',
             joinColumn: {
                 name: 'usuario_id',
                 referencedColumnName: 'id',

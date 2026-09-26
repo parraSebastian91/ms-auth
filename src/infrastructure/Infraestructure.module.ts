@@ -10,11 +10,7 @@ import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter'
 import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContactoEntity } from './database/entities/contacto.entity';
-import { CuentaBancariaEntity } from './database/entities/cuentaBancaria.entity';
 import { ModuloEntity } from './database/entities/modulo.entity';
-import { OrganizacionEntity } from './database/entities/organizacion.entity';
-import { OrganizacionContactoEntity } from './database/entities/organizacionContacto.entity';
-import { OrganizacionSistemaEntity } from './database/entities/organizacionSistema.entity';
 import { PermisoEntity } from './database/entities/permisos.entity';
 import { RolEntity } from './database/entities/rol.entity';
 import { RolModuloPermisoEntity } from './database/entities/rolModuloPermiso.entity';
@@ -31,6 +27,7 @@ import {
 } from '@nestjs/config';
 import { MetricsModule } from './metrics/metrics.module';
 import { PasswordResetRepositoryAdapter } from './adapter/passwordResetRepository.adapter';
+import { UserProfileRepositoryAdapter } from './adapter/userProfileRepository.adapter';
 import { CacheModule } from '@nestjs/cache-manager';
 import { RedisStore } from 'connect-redis';
 import { CacheRepositoryAdapter } from './adapter/cacheRepository.adapter';
@@ -45,11 +42,7 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
     ConfigModule,
     TypeOrmModule.forFeature([
       ContactoEntity,
-      CuentaBancariaEntity,
       ModuloEntity,
-      OrganizacionEntity,
-      OrganizacionContactoEntity,
-      OrganizacionSistemaEntity,
       PermisoEntity,
       RolEntity,
       RolModuloPermisoEntity,
@@ -88,6 +81,7 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
     RolRepositoryAdapter,
     RefreshSessionRepositoryAdapter,
     PasswordResetRepositoryAdapter,
+    UserProfileRepositoryAdapter,
     CacheRepositoryAdapter,
     { provide: EMAIL_SERVICE, useClass: ConsoleEmailAdapter },
   ],
@@ -98,6 +92,7 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
     RefreshSessionRepositoryAdapter,
     MetricsModule,
     PasswordResetRepositoryAdapter,
+    UserProfileRepositoryAdapter,
     CacheRepositoryAdapter,
     EMAIL_SERVICE,
   ],

@@ -22,7 +22,7 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
     userAgent?: string
   ): Promise<{ tokenUuid: string }> {
     const query = `
-      INSERT INTO core.password_reset_tokens 
+      INSERT INTO identity.password_reset_tokens 
         (user_id, email, token_hash, expires_at, ip_address, user_agent)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING token_uuid
@@ -57,7 +57,7 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
         email,
         expires_at as "expiresAt",
         used_at as "usedAt"
-      FROM core.password_reset_tokens
+      FROM identity.password_reset_tokens
       WHERE token_uuid = $1
         AND expires_at > NOW()
         AND used_at IS NULL
@@ -70,7 +70,7 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
 
   async markTokenAsUsed(tokenId: number): Promise<void> {
     const query = `
-      UPDATE core.password_reset_tokens
+      UPDATE identity.password_reset_tokens
       SET used_at = NOW()
       WHERE id = $1
     `;
@@ -80,7 +80,7 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
 
   async deleteExpiredTokens(): Promise<void> {
     const query = `
-      DELETE FROM core.password_reset_tokens
+      DELETE FROM identity.password_reset_tokens
       WHERE expires_at < NOW()
     `;
 
@@ -89,7 +89,7 @@ export class PasswordResetRepositoryAdapter implements IPasswordResetRepository 
 
   async deleteUserTokens(userId: number): Promise<void> {
     const query = `
-      DELETE FROM core.password_reset_tokens
+      DELETE FROM identity.password_reset_tokens
       WHERE user_id = $1
     `;
 

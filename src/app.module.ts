@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InfraestructureModule } from './infrastructure/Infraestructure.module';
+import { UserProfileRepositoryAdapter } from './infrastructure/adapter/userProfileRepository.adapter';
 import { CoreModule } from './core/core.module';
 import { UsuarioRepositoryAdapter } from './infrastructure/adapter/usuarioRepository.adapter';
 import { ConfigModule } from '@nestjs/config';
@@ -29,6 +30,7 @@ import { MetricsModule } from './infrastructure/metrics/metrics.module';
         refreshSessionRepository: RefreshSessionRepositoryAdapter,
         passwordResetRepository: PasswordResetRepositoryAdapter,
         cacheRepository: CacheRepositoryAdapter,
+        userProfileRepository: UserProfileRepositoryAdapter,
       },
     }),
   ],

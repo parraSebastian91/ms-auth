@@ -1,4 +1,4 @@
-import { Catch, ExceptionFilter, ArgumentsHost, Logger, HttpStatus, ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import { Catch, ExceptionFilter, ArgumentsHost, Logger, HttpException, HttpStatus, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { Request, Response } from "express";
 import { InsertError } from "../../core/domain/errors/Insert.error";
 import { ReqValidationError } from "../../core/domain/errors/reqValidation.error";
@@ -84,6 +84,12 @@ export class CoreExceptionFilter implements ExceptionFilter {
         else if (exception instanceof LoginError) {
             Logger.warn(`Login Error: ${exception.message}`, exception.stack);
             status = HttpStatus.BAD_REQUEST;
+            message = exception.message;
+        }
+        else if (exception instanceof HttpException) {
+            // Excepciones HTTP de Nest no mapeadas arriba (p. ej. ParseUUIDPipe -> 400): conservar su estado
+            Logger.warn(`HttpException ${exception.getStatus()}: ${exception.message}`);
+            status = exception.getStatus();
             message = exception.message;
         }
         else {

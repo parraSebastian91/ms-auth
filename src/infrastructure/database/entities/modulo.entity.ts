@@ -4,7 +4,7 @@ import { PermisoEntity } from "./permisos.entity";
 import { RolEntity } from "./rol.entity";
 import { FuncionalidadEntity } from "./funcionalidad.entity";
 
-@Entity({ name: 'modulo', schema: 'core' }) 
+@Entity({ name: 'modulo', schema: 'identity' }) 
 export class ModuloEntity {
 
     @PrimaryGeneratedColumn({ name: 'modulo_id', type: 'bigint' })
@@ -37,6 +37,7 @@ export class ModuloEntity {
     )
     @JoinTable({
         name: 'rol_modulo_permiso',
+        schema: 'identity',
         joinColumn: {
             name: 'modulo_id',
             referencedColumnName: 'id',
@@ -55,6 +56,7 @@ export class ModuloEntity {
     )
     @JoinTable({
         name: 'rol_modulo_permiso',
+        schema: 'identity',
         joinColumn: {
             name: 'modulo_id',
             referencedColumnName: 'id',

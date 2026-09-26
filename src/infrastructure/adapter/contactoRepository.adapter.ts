@@ -26,7 +26,7 @@ export class ContactoRepositoryAdapter implements IContactoRepository {
 
     async create(data: RegistroContactoModel): Promise<number> {
         let sql = `
-        INSERT INTO core.contacto (nombres, apellido_paterno, apellido_materno, direccion, celular, correo, tipo_documento, numero_documento, pais_emision, fecha_nacimiento, redes_sociales, tipo_contacto_id, created_at, updated_at, activo, eliminado_at) 
+        INSERT INTO identity.contacto (nombres, apellido_paterno, apellido_materno, direccion, celular, correo, tipo_documento, numero_documento, pais_emision, fecha_nacimiento, redes_sociales, tipo_contacto_id, created_at, updated_at, activo, eliminado_at) 
         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9::bpchar, $10, '{}'::jsonb, $11, now(), now(), true, NULL)
         RETURNING contacto_id;
         `;

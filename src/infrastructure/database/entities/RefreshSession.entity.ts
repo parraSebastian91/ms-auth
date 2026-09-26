@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, Generated, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { UsuarioEntity } from './usuario.entity'; // ajusta ruta si difiere
 
-@Entity('auth_refresh_sessions')
+@Entity({ name: 'auth_refresh_sessions', schema: 'identity' })
 export class RefreshSessionEntity {
   
   @PrimaryGeneratedColumn('increment')

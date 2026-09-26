@@ -2,7 +2,7 @@ import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from "t
 import { RolEntity } from "./rol.entity";
 import { ModuloEntity } from "./modulo.entity";
 
-@Entity({ name: 'permiso', schema: 'core' })
+@Entity({ name: 'permiso', schema: 'identity' })
 export class PermisoEntity {
 
     @PrimaryGeneratedColumn({ name: 'permiso_id', type: 'bigint' })
@@ -27,6 +27,7 @@ export class PermisoEntity {
     )
     @JoinTable({
                 name: 'rol_modulo_permiso',
+                schema: 'identity',
                 joinColumn: {
                     name: 'permiso_id',
                     referencedColumnName: 'id',
@@ -45,6 +46,7 @@ export class PermisoEntity {
     )
      @JoinTable({
                 name: 'rol_modulo_permiso',
+                schema: 'identity',
                 joinColumn: {
                     name: 'permiso_id',
                     referencedColumnName: 'id',

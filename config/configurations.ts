@@ -13,7 +13,7 @@ export default () => ({
     database: process.env.DATABASE_NAME,
     username: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
-    schema: process.env.DATABASE_SCHEMA,
+    schema: process.env.DATABASE_SCHEMA_IDENTITY || 'identity',
     ssl: process.env.DATABASE_SSL === 'true',
   },
   redis: {
