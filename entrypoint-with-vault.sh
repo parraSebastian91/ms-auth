@@ -42,6 +42,7 @@ load_redis(){
     local path="secret/data/flowis/redis"
     export REDIS_HOST=$(vault_get "$path" "REDIS_HOST")
     export REDIS_PORT=$(vault_get "$path" "REDIS_PORT")
+    export REDIS_PASS=$(vault_get "$path" "REDIS_PASS")
     export REDIS_DB=$(vault_get "$path" "REDIS_DB")
     export REDIS_TTL=$(vault_get "$path" "REDIS_TTL")
 }

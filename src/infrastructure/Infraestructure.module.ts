@@ -70,12 +70,14 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
         );
         const redisPort = configService.get<number>('redis.port', 6379);
         const redisTTL = configService.get<number>('redis.ttl', 3600) * 1000; 
+        const redisPass = configService.get<string>('redis.password'); 
         return {
           isGlobal: true,
           store: RedisStore,
           host: redisHost,
           port: redisPort,
           ttl: redisTTL, // 1 hora por defecto
+          password: redisPass,
         };
       },
     }),
