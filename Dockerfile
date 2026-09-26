@@ -1,8 +1,8 @@
 # ============================================
 # Dockerfile - Production con Vault Integration (pnpm)
 # ============================================
-# Build: docker build -t sebaondocker/seis-auth-service:vault .
-# Push:  docker push sebaondocker/seis-auth-service:vault
+# Build: docker build -t sebaondocker/seis-identity-service:vault .
+# Push:  docker push sebaondocker/seis-identity-service:vault
 
 # Configuración global para habilitar pnpm via Corepack en Alpine
 FROM node:20-alpine AS base

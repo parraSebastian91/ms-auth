@@ -14,7 +14,7 @@ import {
         enabled: true,
       },
       defaultLabels: {
-        app: 'ms-auth',
+        app: 'ms-identity',
       },
     }),
   ],

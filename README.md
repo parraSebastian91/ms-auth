@@ -1,6 +1,6 @@
-# ms-auth - Microservicio de Autenticacion y Autorizacion
+# ms-identity - Microservicio de Autenticacion y Autorizacion
 
-**Servicio:** ms-auth  
+**Servicio:** ms-identity  
 **Puerto:** 3000 (configurable via `PORT`)  
 **Version:** 0.0.1  
 **Ultima actualizacion:** 2026-07-26
@@ -16,7 +16,7 @@ Microservicio responsable de autenticacion, autorizacion, gestion de sesiones y 
 ## Arquitectura
 
 ```
-Frontend → BFF (3002) → ms-auth (3000)
+Frontend → BFF (3002) → ms-identity (3000)
                             ↓
                    PostgreSQL + Redis + Vault
 ```
@@ -138,7 +138,7 @@ Frontend → BFF (3002) → ms-auth (3000)
 ### Flujo de Login
 
 1. Usuario envia `POST /security/login` con username/password
-2. ms-auth valida credenciales contra PostgreSQL
+2. ms-identity valida credenciales contra PostgreSQL
 3. Si valido:
    - Genera JWT access token (15-30 min expiracion)
    - Genera refresh token (7 dias)
@@ -152,7 +152,7 @@ Frontend → BFF (3002) → ms-auth (3000)
 
 1. Cliente detecta access token expirado
 2. Envia `POST /security/session/refresh` con refresh token en cookie
-3. ms-auth valida refresh token en Redis
+3. ms-identity valida refresh token en Redis
 4. Si valido, genera nuevo access token
 5. Response con nuevo JWT
 
@@ -323,13 +323,13 @@ npm run test:cov      # Coverage
 ### Build
 
 ```bash
-docker build -t ms-auth:latest .
+docker build -t ms-identity:latest .
 ```
 
 ### Logs
 
 ```bash
-docker logs ms-auth -f
+docker logs ms-identity -f
 ```
 
 ---
@@ -353,15 +353,15 @@ Respuesta esperada:
 
 ## Integracion con BFF
 
-El BFF (puerto 3002) consume ms-auth via HTTP para:
+El BFF (puerto 3002) consume ms-identity via HTTP para:
 
-1. **Validar sesiones:** BFF envia `sessionId` desde cookie, ms-auth valida contra Redis
-2. **Refresh tokens:** BFF proxy requests de `/security/session/refresh` a ms-auth
+1. **Validar sesiones:** BFF envia `sessionId` desde cookie, ms-identity valida contra Redis
+2. **Refresh tokens:** BFF proxy requests de `/security/session/refresh` a ms-identity
 3. **Autorizacion:** BFF valida permisos antes de llamar a ms-core
 
 **Patron:**
 - BFF duplica `JwtAuthGuard` para validar JWT localmente (evita llamadas innecesarias)
-- BFF llama a ms-auth solo para operaciones de escritura (login, logout, refresh)
+- BFF llama a ms-identity solo para operaciones de escritura (login, logout, refresh)
 
 ---
 
@@ -420,7 +420,7 @@ Cada request incluye:
 ### Login falla con 401
 
 1. Verificar credenciales en PostgreSQL
-2. Revisar logs: `docker logs ms-auth -f`
+2. Revisar logs: `docker logs ms-identity -f`
 3. Verificar Redis: `redis-cli ping`
 4. Validar JWT_SECRET en Vault
 

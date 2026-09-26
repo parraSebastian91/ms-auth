@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Alias simples para comandos comunes de ms-auth
+# Alias simples para comandos comunes de ms-identity
 
 # Función para mostrar comandos disponibles
 if [ "$1" = "" ] || [ "$1" = "help" ]; then
-    echo "🚀 Comandos rápidos para ms-auth:"
+    echo "🚀 Comandos rápidos para ms-identity:"
     echo ""
     echo "  ./ms logs     - Ver logs recientes"
     echo "  ./ms follow   - Seguir logs en tiempo real"

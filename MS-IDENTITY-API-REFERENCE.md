@@ -1,13 +1,13 @@
-# ms-auth — Referencia Técnica de Endpoints para Agente IA
+# ms-identity — Referencia Técnica de Endpoints para Agente IA
 
-> Servicio: `ms-auth` | Puerto: `3000` (configurable vía `PORT`)
+> Servicio: `ms-identity` | Puerto: `3000` (configurable vía `PORT`)
 > Última actualización: 2026-06-03
 
 ---
 
 ## Arquitectura de Autenticación
 
-ms-auth implementa un flujo **PKCE (Proof Key for Code Exchange)** con sesiones almacenadas en Redis. No expone tokens JWT directamente al cliente — los gestiona internamente y los mapea a una `sessionId` de express-session.
+ms-identity implementa un flujo **PKCE (Proof Key for Code Exchange)** con sesiones almacenadas en Redis. No expone tokens JWT directamente al cliente — los gestiona internamente y los mapea a una `sessionId` de express-session.
 
 ### Cookies emitidas por este servicio
 
@@ -93,7 +93,7 @@ Readiness probe para orquestadores.
 {
   "status": "ok",
   "timestamp": "2026-06-03T12:00:00.000Z",
-  "service": "auth-service",
+  "service": "identity-service",
   "version": "1.0.0"
 }
 ```
@@ -464,6 +464,6 @@ Ejecuta el cambio de contraseña usando el token válido.
 1. **PKCE obligatorio** — no hay endpoint de login simple. Siempre generar `code_verifier` + `code_challenge` antes de `POST /security/authenticate`.
 2. **Gestión de cookies** — el agente debe persistir `auth.session` y `auth.refresh` entre llamadas. Ambas son HttpOnly y no accesibles por JS.
 3. **Sesión dura 1 hora** — implementar renovación proactiva con `POST /security/session/refresh` antes del vencimiento, usando `auth.refresh` (válido 7 días).
-4. **El BFF valida la sesión** — ms-auth emite la sesión, el BFF la verifica. El agente nunca llama a ms-auth directamente para recursos de negocio.
-5. **`x-request-id`** en headers permite correlacionar logs entre ms-auth y BFF para debugging.
+4. **El BFF valida la sesión** — ms-identity emite la sesión, el BFF la verifica. El agente nunca llama a ms-identity directamente para recursos de negocio.
+5. **`x-request-id`** en headers permite correlacionar logs entre ms-identity y BFF para debugging.
 6. **DeviceType** debe ser consistente en todos los pasos del flujo PKCE — usar `WEB` para agentes basados en HTTP.

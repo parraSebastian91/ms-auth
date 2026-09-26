@@ -1,4 +1,4 @@
-# 🐳 Dockerización de ms-auth
+# 🐳 Dockerización de ms-identity
 
 Esta guía explica cómo ejecutar la aplicación NestJS con Docker y Docker Compose.
 
@@ -7,7 +7,7 @@ Esta guía explica cómo ejecutar la aplicación NestJS con Docker y Docker Comp
 - Docker >= 20.10.0
 - Docker Compose >= 2.0.0
 
-# 🐳 Dockerización de ms-auth
+# 🐳 Dockerización de ms-identity
 
 Esta guía explica cómo ejecutar solo la aplicación NestJS con Docker, conectándose a PostgreSQL y Redis externos.
 
@@ -22,7 +22,7 @@ Esta guía explica cómo ejecutar solo la aplicación NestJS con Docker, conect�
 
 Esta dockerización solo incluye:
 
-- **ms-auth**: Aplicación NestJS (Puerto 3000)
+- **ms-identity**: Aplicación NestJS (Puerto 3000)
 
 Se conecta a servicios externos:
 - **PostgreSQL**: Base de datos externa (Puerto 5432)
@@ -40,7 +40,7 @@ Se conecta a servicios externos:
 ./docker-dev.sh
 
 # Ver logs en tiempo real
-docker-compose logs -f ms-auth
+docker-compose logs -f ms-identity
 ```
 
 ### Producción
@@ -54,13 +54,13 @@ cp .env.prod .env.production
 ./docker-prod.sh
 
 # Ver logs
-docker-compose -f docker-compose.prod.yml logs -f ms-auth
+docker-compose -f docker-compose.prod.yml logs -f ms-identity
 ```
 
 ## 📂 Archivos de Configuración
 
 ### Desarrollo
-- `docker-compose.yml`: Solo la aplicación ms-auth
+- `docker-compose.yml`: Solo la aplicación ms-identity
 - `.env.dev`: Variables de entorno para desarrollo
 
 ### Producción
@@ -91,7 +91,7 @@ JWT_SECRET=tu_clave_jwt_super_secreta_y_larga_para_produccion_2024
 
 ## 🔌 Conexión a Servicios Externos
 
-Tu aplicación ms-auth puede conectarse a PostgreSQL y Redis de varias maneras:
+Tu aplicación ms-identity puede conectarse a PostgreSQL y Redis de varias maneras:
 
 ### **Opción 1: Red compartida (recomendada para contenedores)**
 
@@ -173,28 +173,28 @@ REDIS_HOST=192.168.1.101
 
 ```bash
 # Construir solo la aplicación
-docker-compose build ms-auth
+docker-compose build ms-identity
 
 # Reconstruir sin cache
-docker-compose build --no-cache ms-auth
+docker-compose build --no-cache ms-identity
 
 # Ver estado de servicios
 docker-compose ps
 
 # Ejecutar comandos dentro del contenedor
-docker-compose exec ms-auth npm run test
+docker-compose exec ms-identity npm run test
 
 # Ver logs de la aplicación
-docker-compose logs -f ms-auth
+docker-compose logs -f ms-identity
 
 # Reiniciar la aplicación
-docker-compose restart ms-auth
+docker-compose restart ms-identity
 
 # Detener la aplicación
 docker-compose down
 
 # Entrar al contenedor
-docker-compose exec ms-auth sh
+docker-compose exec ms-identity sh
 ```
 
 ## 🔍 Health Check
@@ -239,7 +239,7 @@ La aplicación incluye un endpoint de health check:
 ### Problema: No se puede conectar a PostgreSQL
 ```bash
 # Verificar que PostgreSQL esté listo
-docker exec ms_auth_postgres pg_isready -U desarrollo -d core_erp
+docker exec ms_identity_postgres pg_isready -U desarrollo -d core_erp
 
 # Ver logs de PostgreSQL
 docker-compose logs postgres
@@ -248,10 +248,10 @@ docker-compose logs postgres
 ### Problema: Aplicación no inicia
 ```bash
 # Verificar logs de la aplicación
-docker-compose logs ms-auth
+docker-compose logs ms-identity
 
 # Rebuilder la imagen
-docker-compose build --no-cache ms-auth
+docker-compose build --no-cache ms-identity
 ```
 
 ### Problema: Puerto en uso
@@ -275,7 +275,7 @@ docker system df
 
 ### Inspeccionar contenedor
 ```bash
-docker inspect ms_auth_app
+docker inspect ms_identity_app
 ```
 
 ## 🔄 Actualización
@@ -284,7 +284,7 @@ Para actualizar la aplicación:
 
 1. Hacer pull de cambios
 2. Reconstruir imagen: `./docker-build.sh`
-3. Reiniciar servicios: `docker-compose restart ms-auth`
+3. Reiniciar servicios: `docker-compose restart ms-identity`
 
 ---
 

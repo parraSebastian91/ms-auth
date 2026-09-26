@@ -1,5 +1,5 @@
 {
-  "name": "ms-auth",
+  "name": "ms-identity",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -19,9 +19,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "docker:logs": "docker compose -f ./../../docker-compose-app-services.yml logs -f auth-service",
-    "docker:build": "docker build --no-cache -t sebaondocker/seis-auth-service:latest .",
-    "docker:publish": "docker push sebaondocker/seis-auth-service:latest"
+    "docker:logs": "docker compose -f ./../../docker-compose-app-services.yml logs -f identity-service",
+    "docker:build": "docker build --no-cache -t sebaondocker/seis-identity-service:latest .",
+    "docker:publish": "docker push sebaondocker/seis-identity-service:latest"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

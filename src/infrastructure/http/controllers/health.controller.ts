@@ -45,7 +45,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'auth-service',
+      service: 'identity-service',
       version: process.env.npm_package_version || '1.0.0',
     };
   }

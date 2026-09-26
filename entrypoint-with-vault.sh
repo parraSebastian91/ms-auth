@@ -102,11 +102,11 @@ load_database
 load_redis
 load_JWT
 load_session_env 
-export CORS_ORIGINS=$(vault_get "secret/data/flowis/seis-auth-service" "CORS_ORIGINS")
-export NODE_ENV=$(vault_get "secret/data/flowis/seis-auth-service" "NODE_ENV")
-export PORT=$(vault_get "secret/data/flowis/seis-auth-service" "PORT")
+export CORS_ORIGINS=$(vault_get "secret/data/flowis/ms-identity" "CORS_ORIGINS")
+export NODE_ENV=$(vault_get "secret/data/flowis/ms-identity" "NODE_ENV")
+export PORT=$(vault_get "secret/data/flowis/ms-identity" "PORT")
 export PORT="${PORT:-3000}"
-export MIN_LOG_LEVEL=$(vault_get "secret/data/flowis/seis-auth-service" "MIN_LOG_LEVEL")
+export MIN_LOG_LEVEL=$(vault_get "secret/data/flowis/ms-identity" "MIN_LOG_LEVEL")
 
 echo "🚀 Iniciando aplicación..."
 echo ""

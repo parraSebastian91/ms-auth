@@ -4,7 +4,7 @@ import { IEmailService } from '../../core/domain/puertos/outbound/IEmailService.
 /**
  * ConsoleEmailAdapter — adaptador temporal sin servidor de correo.
  *
- * Imprime el código en los logs del servicio (visible en `docker compose logs ms-auth`).
+ * Imprime el código en los logs del servicio (visible en `docker compose logs ms-identity`).
  * Cuando el servidor de correo esté disponible, crear SmtpEmailAdapter / SendGridEmailAdapter
  * e intercambiarlo en el módulo sin modificar ningún use case.
  *
