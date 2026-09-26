@@ -4,6 +4,7 @@ import {
   makeCounterProvider,
   getToken,
 } from '@willsoto/nestjs-prometheus';
+import { AuthMetricsService } from './auth-metrics.service';
 
 @Global()
 @Module({
@@ -19,6 +20,7 @@ import {
     }),
   ],
   providers: [
+    AuthMetricsService,
     makeCounterProvider({
       name: 'auth_login_attempts_total',
       help: 'Total de intentos de autenticación',
@@ -39,6 +41,7 @@ import {
     }),
   ],
   exports: [
+    AuthMetricsService,
     getToken('auth_login_attempts_total'),
     getToken('auth_token_refresh_total'),
     getToken('auth_register_attempts_total'),

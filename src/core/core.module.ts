@@ -6,7 +6,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DynamicModule, Module, Type } from '@nestjs/common';
 import { AuthAplicationService } from './aplication/service/auth.service';
-import { AuthUseCase } from './aplication/useCase/auth/auth.usecase';
+import { AuthorizationUseCase } from './aplication/useCase/authorization/authorization.usecase';
+import { SessionUseCase } from './aplication/useCase/session/session.usecase';
+import { PasswordResetUseCase } from './aplication/useCase/passwordReset/passwordReset.usecase';
+import { AUTHORIZATION_USE_CASE } from './domain/puertos/inbound/IAuthorizationUseCase.interface';
+import { SESSION_USE_CASE } from './domain/puertos/inbound/ISessionUseCase.interface';
+import { PASSWORD_RESET_USE_CASE } from './domain/puertos/inbound/IPasswordResetUseCase.interface';
 import { CacheModule } from '@nestjs/cache-manager';
 import { IUsuarioRepository } from './domain/puertos/outbound/iUsuarioRepository.interface';
 import { IContactoRepository } from './domain/puertos/outbound/iContactoRepository.interface';
@@ -35,7 +40,6 @@ export type CoreModuleOptions = {
 }
 
 // Application USE CASE reference
-export const AUTH_USE_CASE = 'AUTH_USE_CASE';
 export const REGISTRO_USE_CASE = 'REGISTRO_USE_CASE';
 
 // Application services reference
@@ -114,12 +118,22 @@ export class CoreModule {
             },
         };
 
-        const authUseCaseProvider = {
-            provide: AUTH_USE_CASE,
+        const authorizationUseCaseProvider = {
+            provide: AUTHORIZATION_USE_CASE,
+            inject: [usuarioRepository, AUTH_APPLICATION_SERVICE, cacheRepository],
+            useFactory(
+                usuarioRepo: IUsuarioRepository,
+                authService: AuthAplicationService,
+                cacheRepo: ICacheRepository,
+            ) {
+                return new AuthorizationUseCase(usuarioRepo, authService, cacheRepo);
+            },
+        };
+
+        const sessionUseCaseProvider = {
+            provide: SESSION_USE_CASE,
             inject: [
                 usuarioRepository,
-                contactoRepository,
-                passwordResetRepository,
                 refreshSessionRepository,
                 AUTH_APPLICATION_SERVICE,
                 JwtService,
@@ -127,27 +141,28 @@ export class CoreModule {
                 ConfigService,
             ],
             useFactory(
-                authRepository: IUsuarioRepository,
-                contactoRepository: IContactoRepository,
-                passwordResetRepository: IPasswordResetRepository,
+                usuarioRepo: IUsuarioRepository,
                 refreshSessionRepo: IRefreshSessionRepository,
                 authService: AuthAplicationService,
                 jwtService: JwtService,
-                cacheRepository: ICacheRepository,
+                cacheRepo: ICacheRepository,
                 configService: ConfigService,
             ) {
-                return new AuthUseCase(
-                    authRepository,
-                    contactoRepository,
-                    passwordResetRepository,
-                    refreshSessionRepo,
-                    authService,
-                    jwtService,
-                    cacheRepository,
-                    configService,
-                );
+                return new SessionUseCase(usuarioRepo, refreshSessionRepo, authService, jwtService, cacheRepo, configService);
             },
+        };
 
+        const passwordResetUseCaseProvider = {
+            provide: PASSWORD_RESET_USE_CASE,
+            inject: [usuarioRepository, contactoRepository, passwordResetRepository, refreshSessionRepository],
+            useFactory(
+                usuarioRepo: IUsuarioRepository,
+                contactoRepo: IContactoRepository,
+                passwordResetRepo: IPasswordResetRepository,
+                refreshSessionRepo: IRefreshSessionRepository,
+            ) {
+                return new PasswordResetUseCase(usuarioRepo, contactoRepo, passwordResetRepo, refreshSessionRepo);
+            },
         };
 
         return {
@@ -160,13 +175,17 @@ export class CoreModule {
             providers: [
                 JwtService,
                 authAplicationServiceProvider,
-                authUseCaseProvider,
+                authorizationUseCaseProvider,
+                sessionUseCaseProvider,
+                passwordResetUseCaseProvider,
                 registroUseCaseProvider,
                 userProfileUseCaseProvider,
             ],
             exports: [
                 REGISTRO_USE_CASE,
-                AUTH_USE_CASE,
+                AUTHORIZATION_USE_CASE,
+                SESSION_USE_CASE,
+                PASSWORD_RESET_USE_CASE,
                 USER_PROFILE_USE_CASE,
             ],
         };
