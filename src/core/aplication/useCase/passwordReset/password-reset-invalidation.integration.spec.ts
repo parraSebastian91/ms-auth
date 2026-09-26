@@ -48,6 +48,8 @@ function buildWorld() {
     getSessionsByUserId: async (userId: string) => rows.filter(r => String(r.userId) === userId && !r.revokedAt),
     revokeAllUserSessions: async (userId: string) => { const mine = rows.filter(r => String(r.userId) === userId && !r.revokedAt); mine.forEach(r => (r.revokedAt = new Date())); return mine.length; },
     revokeUserSessions: async () => 0,
+    hasRotationChild: async (id: number) => rows.some(r => r.rotationParentId === id),
+    revokeFamily: async () => 0,
   };
 
   // --- reset tokens y correo ---
@@ -90,6 +92,7 @@ describe('Restablecer contraseña cierra las sesiones de punta a punta', () => {
 
     // solicitar y ejecutar el reset con el token que llegó por correo
     await w.reset.ExecuteRequestReset({ correo: 'ana@test.cl', ip: '1.1.1.1', userAgent: 'jest' });
+    await w.reset.whenIdle();
     const link = new URL(w.sentLinks[0]);
     await w.reset.ExecuteResetPassword({ token: link.searchParams.get('token')!, uuid: link.searchParams.get('uuid')!, newPassword: 'Nueva#1234', confirmPassword: 'Nueva#1234' });
 
@@ -112,6 +115,7 @@ describe('Restablecer contraseña cierra las sesiones de punta a punta', () => {
     await w.addUser(1, 'ana', 'Vieja#1234', 'ana@test.cl');
 
     await w.reset.ExecuteRequestReset({ correo: 'ana@test.cl', ip: '1.1.1.1', userAgent: 'jest' });
+    await w.reset.whenIdle();
     const link = new URL(w.sentLinks[0]);
     const cmd = { token: link.searchParams.get('token')!, uuid: link.searchParams.get('uuid')!, newPassword: 'Nueva#1234', confirmPassword: 'Nueva#1234' };
     await w.reset.ExecuteResetPassword(cmd);

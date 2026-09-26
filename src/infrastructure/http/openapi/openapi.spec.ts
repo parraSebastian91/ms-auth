@@ -19,11 +19,11 @@ describe('Contrato OpenAPI de ms-identity', () => {
     expect(operations().map(o => o.key).sort()).toEqual([
       'GET /health', 'GET /health/live', 'GET /health/ready',
       'GET /registro/check/{field}',
-      'GET /security/logout',
       'GET /security/password-reset/validate',
       'GET /usuario/profile/{uuid}',
       'POST /registro', 'POST /registro/resend-otp', 'POST /registro/verificar-email',
       'POST /security/authorize',
+      'POST /security/logout',
       'POST /security/password-reset/request', 'POST /security/password-reset/reset',
       'POST /security/session/refresh',
       'POST /security/token',
@@ -54,7 +54,7 @@ describe('Contrato OpenAPI de ms-identity', () => {
     expect(ops['GET /usuario/profile/{uuid}'].security).toEqual([{ bearer: [] }]);
     expect(ops['PUT /usuario/profile/{uuid}'].security).toEqual([{ bearer: [] }]);
     expect(ops['POST /security/session/refresh'].security).toEqual([{ refresh: [] }]);
-    expect(ops['GET /security/logout'].security).toEqual([{ session: [] }]);
+    expect(ops['POST /security/logout'].security).toEqual([{ session: [] }]);
     expect(ops['POST /security/authorize'].security).toBeUndefined();
   });
 

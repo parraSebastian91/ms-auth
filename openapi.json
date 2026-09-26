@@ -256,11 +256,10 @@
       }
     },
     "/security/logout": {
-      "get": {
+      "post": {
         "operationId": "SessionController_logout",
         "summary": "Cierra la sesión",
-        "description": "Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Nota: cambia estado con GET (pendiente migrar a POST).",
-        "deprecated": false,
+        "description": "Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Es POST (cambia estado): la cookie de sesión es SameSite=Lax, por lo que otro sitio no puede cerrar la sesión del usuario.",
         "parameters": [],
         "responses": {
           "200": {

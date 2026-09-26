@@ -48,7 +48,9 @@ describe('Los casos de uso no registran datos personales completos', () => {
     const cmd = { correo: EMAIL, ip: '1.1.1.1', userAgent: 'jest' };
     await build(null).ExecuteRequestReset(cmd);
     await build({ usuario: { id: 7, activo: false } }).ExecuteRequestReset(cmd);
-    await build({ nombres: 'Ana', usuario: { id: 7, activo: true, userName: USER } }).ExecuteRequestReset(cmd);
+    const activo = build({ nombres: 'Ana', usuario: { id: 7, activo: true, userName: USER } });
+    await activo.ExecuteRequestReset(cmd);
+    await activo.whenIdle(); // el trabajo posterior también registra logs
 
     expect(lines.length).toBeGreaterThan(5);
     for (const l of lines) { expect(l).not.toContain(EMAIL); expect(l).not.toContain(USER); }

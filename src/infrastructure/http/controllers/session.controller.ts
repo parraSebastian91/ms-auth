@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters, UseGuards } from '@nestjs/common';
 
 import { ApiCookieAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -61,14 +61,13 @@ export class SessionController {
     return { message: 'Sesión renovada' };
   }
 
-  @Get('logout')
+  @Post('logout')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth('session')
   @ApiOperation({
     summary: 'Cierra la sesión',
-    description: 'Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Nota: cambia estado con GET (pendiente migrar a POST).',
-    deprecated: false,
+    description: 'Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Es POST (cambia estado): la cookie de sesión es SameSite=Lax, por lo que otro sitio no puede cerrar la sesión del usuario.',
   })
   @ApiEnvelopeResponse({ description: 'Sesión cerrada.', message: 'Logout exitoso' })
   async logout(@Session() session: HttpSession, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

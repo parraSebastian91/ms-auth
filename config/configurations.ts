@@ -2,6 +2,8 @@
 export default () => ({
   app: {
     port: parseInt(process.env.PORT, 10),
+    // Ventana tras una rotación en la que reusar el token viejo NO se trata como robo (dos pestañas refrescando a la vez)
+    refreshReuseGraceMs: parseInt(process.env.REFRESH_REUSE_GRACE_SECONDS ?? '30', 10) * 1000,
     frontendUrl: process.env.FRONTEND_URL, // base del enlace de restablecimiento de contraseña
     ttlAuthCode: parseInt(process.env.TTL_AUTH_CODE ?? '60', 10) * 1000, // 1 minutos por defecto
     ttlSession: parseInt(process.env.TTL_SESSION ?? '3600', 10) * 1000, // 1 hora por defecto

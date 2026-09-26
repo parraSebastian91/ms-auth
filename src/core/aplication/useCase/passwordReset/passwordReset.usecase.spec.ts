@@ -52,6 +52,7 @@ describe('PasswordResetUseCase', () => {
       const { uc, resetRepo } = setup({ contacto: activeContacto });
       const before = Date.now();
       await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
+      await uc.whenIdle();
 
       expect(resetRepo.deleteUserTokens).toHaveBeenCalledWith(7);
       const [userId, correo, hash, expiresAt, ip, ua] = resetRepo.createResetToken.mock.calls[0];
@@ -64,6 +65,7 @@ describe('PasswordResetUseCase', () => {
     it('envía por correo un enlace cuyo token corresponde al hash guardado', async () => {
       const { uc, resetRepo, emailService } = setup({ contacto: activeContacto });
       await uc.ExecuteRequestReset(cmd);
+      await uc.whenIdle();
 
       expect(emailService.sendPasswordResetLink).toHaveBeenCalledTimes(1);
       const [to, url, nombre] = emailService.sendPasswordResetLink.mock.calls[0];
@@ -89,11 +91,59 @@ describe('PasswordResetUseCase', () => {
       const { uc, emailService } = setup({ contacto: activeContacto });
       emailService.sendPasswordResetLink.mockRejectedValue(new Error('SMTP caído'));
       await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
+      await expect(uc.whenIdle()).resolves.toBeUndefined();
+    });
+
+    describe('anti-enumeración por TIEMPO: el trabajo costoso no está en la ruta de respuesta', () => {
+      it('al responder aún no se hizo el bcrypt ni se guardó el token (corren en segundo plano)', async () => {
+        const { uc, resetRepo } = setup({ contacto: activeContacto });
+        await uc.ExecuteRequestReset(cmd);
+        expect(resetRepo.createResetToken).not.toHaveBeenCalled(); // bcrypt de coste 10 tarda decenas de ms
+        await uc.whenIdle();
+        expect(resetRepo.createResetToken).toHaveBeenCalledTimes(1);
+      });
+
+      it('un envío de correo lento no retrasa la respuesta', async () => {
+        const { uc, emailService } = setup({ contacto: activeContacto });
+        let release!: () => void;
+        emailService.sendPasswordResetLink.mockReturnValue(new Promise<void>(r => { release = r; }));
+
+        await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC }); // no espera al SMTP
+        release();
+        await uc.whenIdle();
+        expect(emailService.sendPasswordResetLink).toHaveBeenCalledTimes(1);
+      });
+
+      it('existente y no existente hacen lo mismo antes de responder: una sola búsqueda del contacto', async () => {
+        const existing = setup({ contacto: activeContacto });
+        const missing = setup();
+        await existing.uc.ExecuteRequestReset(cmd);
+        await missing.uc.ExecuteRequestReset(cmd);
+        expect(existing.contactoRepo.findByCorreo).toHaveBeenCalledTimes(1);
+        expect(missing.contactoRepo.findByCorreo).toHaveBeenCalledTimes(1);
+        await existing.uc.whenIdle();
+      });
+
+      it('un fallo en segundo plano (BD) no llega al cliente: se registra y se responde igual', async () => {
+        const { uc, resetRepo } = setup({ contacto: activeContacto });
+        resetRepo.createResetToken.mockRejectedValue(new Error('bd caída'));
+        await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
+        await expect(uc.whenIdle()).resolves.toBeUndefined();
+      });
+
+      it('al apagar espera a los correos pendientes (no se pierden)', async () => {
+        const { uc, emailService } = setup({ contacto: activeContacto });
+        await uc.ExecuteRequestReset(cmd);
+        await uc.onModuleDestroy();
+        expect(emailService.sendPasswordResetLink).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('la misma respuesta para correo inexistente, inactivo y activo (anti-enumeración por cuerpo)', async () => {
       const a = await setup().uc.ExecuteRequestReset(cmd);
-      const b = await setup({ contacto: activeContacto }).uc.ExecuteRequestReset(cmd);
+      const activo = setup({ contacto: activeContacto });
+      const b = await activo.uc.ExecuteRequestReset(cmd);
+      await activo.uc.whenIdle();
       const c = await setup({ contacto: { usuario: { id: 7, activo: false } } }).uc.ExecuteRequestReset(cmd);
       expect(a).toEqual(b);
       expect(a).toEqual(c);

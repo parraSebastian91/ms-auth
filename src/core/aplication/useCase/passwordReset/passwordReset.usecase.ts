@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { IPasswordResetUseCase } from 'src/core/domain/puertos/inbound/IPasswordResetUseCase.interface';
@@ -16,8 +16,9 @@ import {
 
 /** Recuperación de contraseña: solicitar enlace, validar token y restablecer. */
 @Injectable()
-export class PasswordResetUseCase implements IPasswordResetUseCase {
+export class PasswordResetUseCase implements IPasswordResetUseCase, OnModuleDestroy {
   private readonly logger = new Logger(PasswordResetUseCase.name);
+  private readonly pending = new Set<Promise<void>>();
 
   constructor(
     private usuarioRepository: IUsuarioRepository,
@@ -28,6 +29,12 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     private options: { frontendUrl: string },
   ) {}
 
+  /**
+   * Responde SIEMPRE lo mismo y en el mismo tiempo, exista o no el correo. Lo único que se hace antes de responder
+   * es la búsqueda del contacto (igual en ambos casos); el trabajo costoso —borrar tokens, bcrypt, guardar el token
+   * y enviar el correo— corre en segundo plano solo para cuentas activas. Así ni el cuerpo ni la duración de la
+   * respuesta revelan si el correo está registrado. Errores del segundo plano se registran, no llegan al cliente.
+   */
   async ExecuteRequestReset(
     command: RequestPasswordResetCommand,
   ): Promise<{ message: string }> {
@@ -41,7 +48,6 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     };
 
     if (!contacto) {
-      // Por seguridad, no revelar si el email existe o no
       this.logger.warn(
         `[PASSWORD_RESET_REQUEST] NON_EXISTENT_EMAIL requestId=${requestId} email=${maskEmail(command.correo)}`,
       );
@@ -49,13 +55,36 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     }
 
     if (!contacto.usuario.activo) {
-      // Misma respuesta que para un correo inexistente: no revelar el estado de la cuenta.
       this.logger.warn(
         `[PASSWORD_RESET_REQUEST] INACTIVE_USER requestId=${requestId} email=${maskEmail(command.correo)}`,
       );
       return genericResponse;
     }
 
+    this.runInBackground(`PASSWORD_RESET_REQUEST requestId=${requestId}`, () =>
+      this.issueResetToken(command, contacto, requestId),
+    );
+    return genericResponse;
+  }
+
+  /** Espera a que termine el trabajo en segundo plano (pruebas y apagado ordenado). */
+  async whenIdle(): Promise<void> {
+    while (this.pending.size > 0) await Promise.allSettled([...this.pending]);
+  }
+
+  /** Al apagar, no perder correos de restablecimiento que aún se estén emitiendo. */
+  async onModuleDestroy(): Promise<void> {
+    await this.whenIdle();
+  }
+
+  private runInBackground(label: string, task: () => Promise<void>): void {
+    const promise: Promise<void> = task()
+      .catch((error: any) => this.logger.error(`[${label}] BACKGROUND_FAILED: ${error?.message ?? error}`))
+      .finally(() => this.pending.delete(promise));
+    this.pending.add(promise);
+  }
+
+  private async issueResetToken(command: RequestPasswordResetCommand, contacto: any, requestId: string): Promise<void> {
     // Eliminar tokens anteriores del usuario
     await this.passwordResetRepo.deleteUserTokens(contacto.usuario.id);
 
@@ -79,8 +108,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     // Construir URL de restablecimiento
     const resetUrl = `${this.options.frontendUrl}/pages/restablecer-password?token=${token}&uuid=${tokenUuid}`;
 
-    // El envío es "mejor esfuerzo": si falla NO se cambia la respuesta (un error revelaría que el correo
-    // existe). El adaptador concreto (SMTP, SES, ...) se conecta por el puerto IEmailService.
+    // El envío es "mejor esfuerzo": el adaptador concreto (SMTP, SES, ...) se conecta por el puerto IEmailService.
     try {
       await this.emailService.sendPasswordResetLink(command.correo, resetUrl, contacto.nombres ?? contacto.usuario.userName);
     } catch (error: any) {
@@ -92,8 +120,6 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     this.logger.log(
       `[PASSWORD_RESET_REQUEST] TOKEN_CREATED requestId=${requestId} email=${maskEmail(command.correo)} tokenUuid=${tokenUuid} expiresAt=${expiresAt.toISOString()}`,
     );
-
-    return genericResponse;
   }
 
   async ExecuteValidateResetToken(

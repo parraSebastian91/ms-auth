@@ -10,6 +10,7 @@ function setup() {
     rotate: jest.fn(async (_old: any, n: any) => ({ ...n, sessionUuid: 'rotated-uuid' })),
     revokeById: jest.fn(async () => undefined),
     revokeUserSessions: jest.fn(async () => 2),
+    findById: jest.fn(async (): Promise<any> => null),
     getSessionsByUserId: jest.fn(async (): Promise<any[]> => []),
     revokeAllUserSessions: jest.fn(async () => 0),
   };
@@ -108,6 +109,43 @@ describe('AuthAplicationService', () => {
       expect(await ttl(['ADMIN'])).toBe(30 * 60);
       expect(await ttl(['SUPER_ADMIN'])).toBe(30 * 60);
       expect(await ttl(['CLIENTE_CEDENTE'])).toBe(5 * 60);
+    });
+  });
+
+  describe('rotateSession — cadena de rotación', () => {
+    const current = { userId: 7, userUuid: 'u-1', sessionId: 'sid-1', sessionUuid: 'old-uuid', typeDevice: 'WEB', roles: [], permissions: [] } as any;
+
+    it('enlaza la sesión nueva con la que rota (rotation_parent_id) y actualiza la fila vieja por su uuid', async () => {
+      const { svc, refreshRepo } = setup();
+      await svc.rotateSession(current, undefined, 42);
+
+      const [oldSession, newSession] = refreshRepo.rotate.mock.calls[0];
+      expect(oldSession.id).toBe(42);
+      expect(oldSession.sessionUuid).toBe('old-uuid'); // antes era null: el UPDATE de la fila vieja no encontraba nada
+      expect(newSession.rotationParentId).toBe(42);
+      expect(newSession.sessionId).toBe('sid-1');
+    });
+
+    it('con el id conocido no hace una consulta extra', async () => {
+      const { svc, refreshRepo } = setup();
+      await svc.rotateSession(current, undefined, 42);
+      expect(refreshRepo.findById).not.toHaveBeenCalled();
+    });
+
+    it('sin el id lo busca por el uuid de la sesión actual', async () => {
+      const { svc, refreshRepo } = setup();
+      refreshRepo.findById.mockResolvedValue({ id: 99 });
+      await svc.rotateSession(current);
+      expect(refreshRepo.findById).toHaveBeenCalledWith('old-uuid');
+      expect(refreshRepo.rotate.mock.calls[0][1].rotationParentId).toBe(99);
+    });
+
+    it('la sesión nueva expone un secreto distinto en cada rotación y conserva el sessionId', async () => {
+      const { svc } = setup();
+      const a = await svc.rotateSession(current, undefined, 1);
+      const b = await svc.rotateSession(current, undefined, 1);
+      expect(a.plainToken).not.toBe(b.plainToken);
+      expect(a.plainToken.startsWith('sid-1.')).toBe(true);
     });
   });
 

@@ -101,7 +101,12 @@ export class AuthAplicationService {
         return { accessToken, refreshToken };
     }
 
-    public async rotateSession(SessionObject: AccessTokenPayload, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<sessionHandler> {
+    /**
+     * Rota la sesión: revoca la actual y crea la siguiente enlazada por `rotation_parent_id`. El enlace es lo
+     * que permite distinguir después un refresh token ROTADO (su reutilización delata un robo) de uno cerrado por
+     * logout. `parentRowId` es el id (fila) de la sesión que se rota; si no se conoce se consulta por su uuid.
+     */
+    public async rotateSession(SessionObject: AccessTokenPayload, meta?: { ip?: string, ua?: string, fingerprint?: string }, parentRowId?: number | null): Promise<sessionHandler> {
         const t0 = performance.now();
         const lap = (label: string, prev: number) => {
             const ms = (performance.now() - prev).toFixed(1);
@@ -110,6 +115,8 @@ export class AuthAplicationService {
         };
         let t = t0;
         this.logger.log('ROTATE SESSION - INIT');
+
+        const parentId = parentRowId ?? (await this.refreshSessionRepo.findById(SessionObject.sessionUuid))?.id ?? null;
 
         await Promise.all([
             this.refreshSessionRepo.revokeById(SessionObject.sessionUuid),
@@ -123,6 +130,8 @@ export class AuthAplicationService {
         t = lap('hmac.hashTokenSecret', t);
 
         const oldSession = RefreshSessionModel.create({
+            id: parentId,
+            sessionUuid: SessionObject.sessionUuid,
             sessionId: SessionObject.sessionId,
             userId: SessionObject.userId,
             userUuid: SessionObject.userUuid,

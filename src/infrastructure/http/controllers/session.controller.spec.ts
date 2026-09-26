@@ -42,10 +42,10 @@ describe('SessionController', () => {
     });
   });
 
-  describe('GET /security/logout', () => {
+  describe('POST /security/logout', () => {
     it('200: revoca la sesión, la destruye y borra las cookies de refresh y de sesión', async () => {
       const { http, useCase, session } = await setup();
-      const res = await http().get('/security/logout');
+      const res = await http().post('/security/logout');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 200, message: 'Logout exitoso', data: null });
@@ -59,7 +59,7 @@ describe('SessionController', () => {
     it('500 y sin borrar cookies si falla el destroy de la sesión (no responde dos veces)', async () => {
       const { http, session } = await setup();
       session.destroy.mockImplementation((cb: any) => cb(new Error('redis caído')));
-      const res = await http().get('/security/logout');
+      const res = await http().post('/security/logout');
       expect(res.status).toBe(500);
       expect(res.headers['set-cookie']).toBeUndefined();
     });
@@ -67,9 +67,16 @@ describe('SessionController', () => {
     it('si revocar en el caso de uso falla no se destruye la sesión', async () => {
       const { http, useCase, session } = await setup();
       useCase.ExecuteLogout.mockRejectedValue(new Error('bd caída'));
-      expect((await http().get('/security/logout')).status).toBe(500);
+      expect((await http().post('/security/logout')).status).toBe(500);
       expect(session.destroy).not.toHaveBeenCalled();
     });
+  });
+
+  it('logout ya no acepta GET (cambia estado: un enlace o imagen de otro sitio podría cerrar la sesión)', async () => {
+    const { http, useCase, session } = await setup();
+    expect((await http().get('/security/logout')).status).toBe(404);
+    expect(useCase.ExecuteLogout).not.toHaveBeenCalled();
+    expect(session.destroy).not.toHaveBeenCalled();
   });
 
   it('el endpoint de depuración session/test fue retirado', async () => {

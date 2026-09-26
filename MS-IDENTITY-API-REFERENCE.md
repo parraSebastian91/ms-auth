@@ -279,7 +279,7 @@ Set-Cookie: auth.refresh=<nuevoRefreshToken>; Path=/; HttpOnly; SameSite=Lax; Ma
 
 ---
 
-#### `GET /security/logout`
+#### `POST /security/logout`
 
 Destruye la sesión activa, invalida tokens y limpia ambas cookies.
 
@@ -432,7 +432,7 @@ Ejecuta el cambio de contraseña usando el token válido.
    ← Nueva cookie: auth.refresh
 
 6. Logout:
-   GET /security/logout
+   POST /security/logout
    ← Cookies eliminadas
 ```
 
@@ -449,7 +449,7 @@ Ejecuta el cambio de contraseña usando el token válido.
 | `POST` | `/security/authorize` | No | Paso 1 PKCE: validar credenciales |
 | `POST` | `/security/token` | No | Paso 2 PKCE: canjear code → sesión + cookies |
 | `POST` | `/security/session/refresh` | Cookie `auth.refresh` | Renovar sesión expirada |
-| `GET` | `/security/logout` | Cookie `auth.session` | Destruir sesión y limpiar cookies |
+| `POST` | `/security/logout` | Cookie `auth.session` | Destruir sesión y limpiar cookies |
 | `POST` | `/security/password-reset/request` | No | Solicitar email de recuperación |
 | `GET` | `/security/password-reset/validate` | No | Validar token de recuperación |
 | `POST` | `/security/password-reset/reset` | No | Ejecutar cambio de contraseña |

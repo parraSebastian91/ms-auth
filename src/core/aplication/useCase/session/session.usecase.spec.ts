@@ -15,7 +15,11 @@ const payload = (o: any = {}) => ({
 function setup(opts: { session?: any; usuario?: any } = {}) {
   const cache = makeFakeCache();
   const usuarioRepo: any = { getUsuarioById: jest.fn().mockResolvedValue(opts.usuario ?? null) };
-  const refreshRepo: any = { findById: jest.fn().mockResolvedValue(opts.session === undefined ? makeRefreshSession() : opts.session) };
+  const refreshRepo: any = {
+    findById: jest.fn().mockResolvedValue(opts.session === undefined ? makeRefreshSession() : opts.session),
+    hasRotationChild: jest.fn().mockResolvedValue(false),
+    revokeFamily: jest.fn().mockResolvedValue(2),
+  };
   // Servicio real (así el TTL por rol es el de producción); solo se espían las operaciones con E/S.
   const authService: any = new AuthAplicationService(cache as any, refreshRepo, access, makeConfig());
   jest.spyOn(authService, 'verifyTokenSecret').mockReturnValue(true);
@@ -103,11 +107,74 @@ describe('SessionUseCase', () => {
       expect(authService.rotateSession).not.toHaveBeenCalled();
     });
 
-    it('DOCUMENTA: reutilizar un refresh token ya rotado (revocado) solo da 401; no revoca el resto de la familia', async () => {
-      const { uc, authService, refreshRepo } = setup({ session: makeRefreshSession({ revokedAt: new Date() }) });
-      await uc.ExecuteRefreshSession(cmd({ 'auth.refresh': refreshCookie() })).catch(() => undefined);
-      expect(authService.revokeUserSessions).not.toHaveBeenCalled();
-      expect(refreshRepo.findById).toHaveBeenCalledTimes(1);
+  });
+
+  describe('ExecuteRefreshSession — reutilización de un refresh token ya usado', () => {
+    const MIN = 60_000;
+    /** Sesión revocada hace `agoMs` (fecha de la rotación o del logout). */
+    const revokedAgo = (agoMs: number) => makeRefreshSession({ revokedAt: new Date(Date.now() - agoMs) });
+    const replay = (s: ReturnType<typeof setup>) => s.uc.ExecuteRefreshSession(cmd({ 'auth.refresh': refreshCookie() }));
+
+    it('token ROTADO reutilizado pasado el margen: se cierra TODA la cadena, se borra el access token cacheado y da 401', async () => {
+      const s = setup({ session: revokedAgo(5 * MIN) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(true);
+      s.cache.tokens.set('sid-1', access.sign(payload()));
+
+      await expect(replay(s)).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(s.refreshRepo.hasRotationChild).toHaveBeenCalledWith(1);
+      expect(s.refreshRepo.revokeFamily).toHaveBeenCalledWith('sid-1', 7);
+      expect(s.cache.tokens.has('sid-1')).toBe(false);
+      expect(s.authService.rotateSession).not.toHaveBeenCalled();
+    });
+
+    it('dentro del margen de gracia (dos pestañas refrescando a la vez) da 401 pero NO cierra la cadena', async () => {
+      const s = setup({ session: revokedAgo(3_000) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(true);
+      s.cache.tokens.set('sid-1', access.sign(payload()));
+
+      await expect(replay(s)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(s.refreshRepo.revokeFamily).not.toHaveBeenCalled();
+      expect(s.cache.tokens.has('sid-1')).toBe(true);
+    });
+
+    it('token revocado por logout/reset (sin sesión hija) da 401 sin cerrar nada más', async () => {
+      const s = setup({ session: revokedAgo(5 * MIN) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(false);
+      await expect(replay(s)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(s.refreshRepo.revokeFamily).not.toHaveBeenCalled();
+    });
+
+    it('quien no conoce el secreto del token no puede provocar el cierre de la cadena', async () => {
+      const s = setup({ session: revokedAgo(5 * MIN) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(true);
+      s.authService.verifyTokenSecret.mockReturnValue(false);
+      await expect(replay(s)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(s.refreshRepo.revokeFamily).not.toHaveBeenCalled();
+    });
+
+    it('una sesión activa no dispara la detección', async () => {
+      const s = setup();
+      s.cache.tokens.set('sid-1', access.sign(payload()));
+      await replay(s);
+      expect(s.refreshRepo.hasRotationChild).not.toHaveBeenCalled();
+      expect(s.refreshRepo.revokeFamily).not.toHaveBeenCalled();
+    });
+
+    it('si Redis falla al borrar el access token igual se cierra la cadena en BD y se responde 401', async () => {
+      const s = setup({ session: revokedAgo(5 * MIN) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(true);
+      s.cache.deleteAccessToken.mockRejectedValue(new Error('redis caído'));
+      await expect(replay(s)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(s.refreshRepo.revokeFamily).toHaveBeenCalledTimes(1);
+    });
+
+    it('el margen es configurable (app.refreshReuseGraceMs)', async () => {
+      const s = setup({ session: revokedAgo(20_000) });
+      s.refreshRepo.hasRotationChild.mockResolvedValue(true);
+      const custom = new SessionUseCase(s.usuarioRepo, s.refreshRepo, s.authService, access, s.cache as any, makeConfig({ 'app.refreshReuseGraceMs': 60_000 }));
+      await custom.ExecuteRefreshSession(cmd({ 'auth.refresh': refreshCookie() })).catch(() => undefined);
+      expect(s.refreshRepo.revokeFamily).not.toHaveBeenCalled(); // 20 s < 60 s de gracia
     });
   });
 
@@ -117,7 +184,11 @@ describe('SessionUseCase', () => {
       cache.tokens.set('sid-1', access.sign(payload()));
       const out = await uc.ExecuteRefreshSession(cmd({ 'auth.refresh': refreshCookie() }));
 
-      expect(authService.rotateSession).toHaveBeenCalledWith(expect.objectContaining({ userUuid: 'u-1', sessionUuid: 'sess-uuid-1' }), { ip: '1.1.1.1', ua: 'jest', fingerprint: 'fp' });
+      expect(authService.rotateSession).toHaveBeenCalledWith(
+        expect.objectContaining({ userUuid: 'u-1', sessionUuid: 'sess-uuid-1' }),
+        { ip: '1.1.1.1', ua: 'jest', fingerprint: 'fp' },
+        1, // id de la fila que se rota: enlaza la cadena (rotation_parent_id)
+      );
       const nuevo: any = access.verify(out.accessToken);
       expect(nuevo).toMatchObject({ userUuid: 'u-1', sessionUuid: 'new-uuid', roles: ['CLIENTE_CEDENTE'], permissions: ['USR_VIEW'] });
       expect(cache.tokens.get('sid-1')).toBe(out.accessToken);
@@ -130,7 +201,7 @@ describe('SessionUseCase', () => {
       const { uc, usuarioRepo, authService } = setup({ usuario });
       const out = await uc.ExecuteRefreshSession(cmd({ 'auth.refresh': refreshCookie() }));
       expect(usuarioRepo.getUsuarioById).toHaveBeenCalledWith(7);
-      expect(authService.rotateSession).toHaveBeenCalledWith(expect.objectContaining({ roles: ['SUPERVISOR'], permissions: ['ORG_VIEW'] }), expect.anything());
+      expect(authService.rotateSession).toHaveBeenCalledWith(expect.objectContaining({ roles: ['SUPERVISOR'], permissions: ['ORG_VIEW'] }), expect.anything(), 1);
       expect(access.verify(out.accessToken)).toMatchObject({ roles: ['SUPERVISOR'] });
     });
 
