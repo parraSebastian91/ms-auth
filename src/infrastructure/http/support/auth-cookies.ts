@@ -26,11 +26,3 @@ export function clearAuthCookies(req: Request, res: Response): void {
   res.clearCookie(AUTH_COOKIES.REFRESH, refreshCookieOptions(req, 0));
   res.clearCookie(AUTH_COOKIES.SESSION, { httpOnly: true, secure: false, sameSite: 'lax', path: '/' });
 }
-
-/**
- * Id de sesión que viaja en la cookie firmada de express-session (`s:<id>.<firma>`).
- * OJO: no verifica la firma; devuelve undefined si la cookie falta o no tiene ese formato.
- */
-export function sessionIdFromCookie(req: Request): string | undefined {
-  return req.cookies?.[AUTH_COOKIES.SESSION]?.split(':')[1]?.split('.')[0];
-}

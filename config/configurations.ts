@@ -2,6 +2,9 @@
 export default () => ({
   app: {
     port: parseInt(process.env.PORT, 10),
+    // Ventana tras una rotación en la que reusar el token viejo NO se trata como robo (dos pestañas refrescando a la vez)
+    refreshReuseGraceMs: parseInt(process.env.REFRESH_REUSE_GRACE_SECONDS ?? '30', 10) * 1000,
+    frontendUrl: process.env.FRONTEND_URL, // base del enlace de restablecimiento de contraseña
     ttlAuthCode: parseInt(process.env.TTL_AUTH_CODE ?? '60', 10) * 1000, // 1 minutos por defecto
     ttlSession: parseInt(process.env.TTL_SESSION ?? '3600', 10) * 1000, // 1 hora por defecto
     ttlRefreshSession: parseInt(process.env.JWT_REFRESH_EXPIRES_IN ?? '86400', 10) * 1000, // 1 día por defecto
@@ -21,6 +24,7 @@ export default () => ({
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
     ttl: parseInt(process.env.REDIS_TTL, 10) * 1000 || 3600 * 1000, // 1 hora por defecto
     password: process.env.REDIS_PASS,
+    db: parseInt(process.env.REDIS_DB ?? '0', 10) || 0,
   },
   vault: {
     addr: process.env.VAULT_ADDR,

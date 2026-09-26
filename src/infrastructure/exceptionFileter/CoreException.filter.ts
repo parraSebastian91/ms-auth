@@ -7,6 +7,7 @@ import { QueryFailedError, TypeORMError } from "typeorm";
 import { UserExistError } from "src/core/domain/errors/usuarioExistError.error";
 import { ValidationError } from "src/core/domain/errors/validation.error";
 import { UserNotFoundError } from "src/core/domain/errors/UserNotFound.error";
+import { maskIdentifier, maskEmail } from "src/core/share/log-sanitizer";
 import { InvalidcodeToken } from "src/core/domain/errors/InvalidCodeToken.error";
 import { LoginError } from "src/core/domain/errors/LoginError.error";import { EmailNotVerifiedError } from "../../core/domain/errors/EmailNotVerified.error";
 @Catch()
@@ -21,7 +22,7 @@ export class CoreExceptionFilter implements ExceptionFilter {
 
         // Early return: respuesta con estructura especial
         if (exception instanceof EmailNotVerifiedError) {
-            Logger.warn(`EmailNotVerifiedError: email=${exception.email}`);
+            Logger.warn(`EmailNotVerifiedError: email=${maskEmail(exception.email)}`);
             return response.status(403).json({
                 code: 'EMAIL_NOT_VERIFIED',
                 email: exception.email,
@@ -83,7 +84,7 @@ export class CoreExceptionFilter implements ExceptionFilter {
         }
         else if (exception instanceof LoginError) {
             Logger.warn(`Login Error: ${exception.message}`, exception.stack);
-            status = HttpStatus.BAD_REQUEST;
+            status = HttpStatus.UNAUTHORIZED;
             message = exception.message;
         }
         else if (exception instanceof HttpException) {

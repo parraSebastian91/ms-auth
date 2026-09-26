@@ -154,14 +154,17 @@ export class CoreModule {
 
         const passwordResetUseCaseProvider = {
             provide: PASSWORD_RESET_USE_CASE,
-            inject: [usuarioRepository, contactoRepository, passwordResetRepository, refreshSessionRepository],
+            inject: [usuarioRepository, contactoRepository, passwordResetRepository, AUTH_APPLICATION_SERVICE, EMAIL_SERVICE, ConfigService],
             useFactory(
                 usuarioRepo: IUsuarioRepository,
                 contactoRepo: IContactoRepository,
                 passwordResetRepo: IPasswordResetRepository,
-                refreshSessionRepo: IRefreshSessionRepository,
+                authService: AuthAplicationService,
+                emailService: IEmailService,
+                configService: ConfigService,
             ) {
-                return new PasswordResetUseCase(usuarioRepo, contactoRepo, passwordResetRepo, refreshSessionRepo);
+                const frontendUrl = configService.get<string>('app.frontendUrl') || 'http://localhost:8000';
+                return new PasswordResetUseCase(usuarioRepo, contactoRepo, passwordResetRepo, authService, emailService, { frontendUrl });
             },
         };
 

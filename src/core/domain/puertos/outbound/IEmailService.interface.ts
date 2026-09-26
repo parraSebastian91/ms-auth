@@ -12,6 +12,15 @@ export interface IEmailService {
      * @param nombre  Nombre del usuario para personalizar el mensaje
      */
     sendVerificationCode(email: string, code: string, nombre: string): Promise<void>;
+
+    /**
+     * Envía el enlace de restablecimiento de contraseña. `resetUrl` contiene el token en texto plano:
+     * un adaptador real debe enviarlo solo al correo del usuario y nunca registrarlo en logs.
+     */
+    sendPasswordResetLink(email: string, resetUrl: string, nombre: string): Promise<void>;
+
+    /** Avisa al usuario que su contraseña fue cambiada (por si no fue él). */
+    sendPasswordChangedNotice(email: string, nombre: string): Promise<void>;
 }
 
 export const EMAIL_SERVICE = 'EMAIL_SERVICE';

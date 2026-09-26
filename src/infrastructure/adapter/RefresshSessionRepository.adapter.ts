@@ -93,6 +93,21 @@ export class RefreshSessionRepositoryAdapter implements IRefreshSessionRepositor
     return res.affected ?? 0;
   }
 
+  async hasRotationChild(sessionRowId: number): Promise<boolean> {
+    return this.repo.exists({ where: { rotationParentId: sessionRowId } });
+  }
+
+  async revokeFamily(sessionId: string, userId: number): Promise<number> {
+    const res = await this.repo.createQueryBuilder()
+      .update()
+      .set({ revokedAt: () => 'now()' })
+      .where('session_id = :sessionId', { sessionId })
+      .andWhere('user_id = :userId', { userId })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+    return res.affected ?? 0;
+  }
+
   async revokeUserSessions(sessionUuid: string, deviceType?: string): Promise<number> {
     const qb = this.repo.createQueryBuilder()
       .update()

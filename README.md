@@ -7,6 +7,26 @@
 
 ---
 
+## Pruebas
+
+`npm test` corre toda la suite (sin dependencias externas). El rate limit tiene además pruebas contra un Redis real,
+que se omiten si no hay `TEST_REDIS_URL`:
+
+```bash
+docker run -d --rm --name redis-test -p 6390:6379 redis:7-alpine
+TEST_REDIS_URL=redis://localhost:6390 npx jest rate-limit.redis
+docker rm -f redis-test
+```
+
+## Documentación de la API
+
+- **UI Swagger**: `http://localhost:<PORT>/docs` y contrato JSON en `/docs-json` (solo fuera de producción;
+  `SWAGGER_ENABLED=true` la activa en producción). Acceder directo al servicio, no por el prefijo `/api/auth` del gateway.
+- **Contrato versionado**: [`openapi.json`](openapi.json). Un test compara el contrato generado con este archivo;
+  si cambias controladores o DTOs, regenéralo con `npm run openapi`.
+- Los DTOs se documentan con `@ApiProperty` y los controladores con `@ApiTags`/`@ApiOperation`/respuestas;
+  el sobre `{ status, message, data }` se declara con `ApiEnvelopeResponse` (`http/openapi/api-envelope.ts`).
+
 ## Proposito
 
 Microservicio responsable de autenticacion, autorizacion, gestion de sesiones y registro de usuarios en SEIS_App. Maneja JWT tokens, refresh tokens, permisos basados en roles, y recuperacion de contraseñas.

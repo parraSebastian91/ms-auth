@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheckService,
   HealthCheck,
@@ -8,6 +9,7 @@ import {
 } from '@nestjs/terminus';
 import { Public } from '../decorators/public.decorator';
 
+@ApiTags('Health')
 @Public()
 @Controller('health')
 export class HealthController {
@@ -20,6 +22,7 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({ summary: 'Estado detallado (base de datos, memoria y disco)' })
   check() {
     return this.health.check([
       // Database health
@@ -41,6 +44,7 @@ export class HealthController {
   }
 
   @Get('ready')
+  @ApiOperation({ summary: 'Readiness: el servicio está listo para recibir tráfico' })
   ready() {
     return {
       status: 'ok',
@@ -51,6 +55,7 @@ export class HealthController {
   }
 
   @Get('live')
+  @ApiOperation({ summary: 'Liveness: el proceso está vivo' })
   live() {
     return {
       status: 'alive',

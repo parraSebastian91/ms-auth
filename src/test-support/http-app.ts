@@ -1,6 +1,8 @@
 import { ModuleMetadata } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import * as request from 'supertest';
+import { createThrottlerOptions } from 'src/infrastructure/http/rate-limit/rate-limit';
 import { ValidationPipe } from 'src/infrastructure/http/pipes/validation.pipe';
 import { AuthMetricsService } from 'src/infrastructure/metrics/auth-metrics.service';
 
@@ -21,9 +23,10 @@ export function makeMetricsMock() {
 }
 
 /** Levanta solo los controladores indicados, con el mismo pipe/cookies que main.ts y sin guards globales. */
-export async function createHttpApp(meta: Pick<ModuleMetadata, 'controllers' | 'providers'>, session = makeFakeSession()) {
+export async function createHttpApp(meta: Pick<ModuleMetadata, 'controllers' | 'providers'>, session = makeFakeSession(), throttler: ThrottlerModuleOptions = createThrottlerOptions()) {
   const metrics = makeMetricsMock();
   const moduleRef = await Test.createTestingModule({
+    imports: [ThrottlerModule.forRoot(throttler)],
     controllers: meta.controllers,
     providers: [...(meta.providers ?? []), { provide: AuthMetricsService, useValue: metrics }],
   }).compile();

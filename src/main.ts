@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from './infrastructure/http/pipes/validation.pipe';
+import { setupSwagger } from './infrastructure/http/openapi/build-openapi-document';
 
 import * as session from 'express-session';
 import { createClient } from 'redis';
@@ -15,7 +16,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser());
-  app.getHttpAdapter().getInstance().set('trust proxy', true);
+  // Los servicios siempre están detrás de APISIX: se confía en 1 salto (el gateway), de modo que req.ip es la IP que
+  // vio APISIX. `trust proxy: true` confiaría en toda la cadena X-Forwarded-For y el cliente podría falsear su IP
+  // (y evadir el límite por IP). Ajustable con TRUST_PROXY_HOPS si se agrega otro proxy delante.
+  const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '', 10);
+  app.getHttpAdapter().getInstance().set('trust proxy', Number.isNaN(trustProxyHops) ? 1 : trustProxyHops);
   // Deshabilitar CORS completamente
 
   const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4200';
@@ -84,6 +89,12 @@ async function bootstrap() {
   //   console.log('IP remota:', req.ip);
   //   next();
   // });
+
+  // Documentación OpenAPI: activa fuera de producción, o con SWAGGER_ENABLED=true.
+  // UI en /docs y JSON en /docs-json (acceder directo al servicio, no por el prefijo /api/auth del gateway).
+  if (!isProd || process.env.SWAGGER_ENABLED === 'true') {
+    setupSwagger(app, process.env.npm_package_version);
+  }
 
   const port = Number.parseInt(process.env.PORT ?? '', 10) || 3000;
   await app.listen(port, '0.0.0.0').then(() => {

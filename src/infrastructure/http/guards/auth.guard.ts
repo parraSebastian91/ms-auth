@@ -25,28 +25,22 @@ export class AuthGuard implements CanActivate {
       return true;
     }
     const queryValidate: validateQuery = {
-      sessionId: await this.extractSession(request)
+      sessionId: this.extractSession(request)
     }
     return await this.sessionUseCase.ExecuteValidateSession(queryValidate);
 
   }
 
-  /** Extrae el sessionId de la cookie auth.session, lanzando 401 limpio
-   *  si la cookie no vino en vez de romper con un TypeError. Mismo patrón
-   *  ya usado en bff_seis_app/.../guards/auth.guard.ts. */
-  private async extractSession(request: Request): Promise<string> {
-    const rawSession = request.cookies?.['auth.session'];
-    if (!rawSession || typeof rawSession !== 'string') {
-      this.logger.warn('Cookie auth.session ausente o inválida');
-      throw new UnauthorizedException('No session cookie found');
+  /**
+   * Id de la sesión de express-session. Lo resuelve el middleware verificando la firma de la
+   * cookie `auth.session`; no se parsea la cookie a mano (sin verificar y controlada por el cliente).
+   */
+  private extractSession(request: Request): string {
+    const sessionId = (request as any).sessionID;
+    if (!sessionId || typeof sessionId !== 'string') {
+      this.logger.warn('Petición sin sesión de express-session');
+      throw new UnauthorizedException('No session found');
     }
-
-    const sessionId = rawSession.split(':')[1]?.split('.')[0];
-    if (!sessionId) {
-      this.logger.warn('No fue posible extraer sessionId desde auth.session');
-      throw new UnauthorizedException('Invalid session cookie format');
-    }
-
     return sessionId;
   }
 }

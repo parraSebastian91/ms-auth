@@ -1,5 +1,12 @@
 # ms-identity — Referencia Técnica de Endpoints para Agente IA
 
+> **Contrato máquina-legible:** `BACKEND/ms-identity/openapi.json` (OpenAPI 3, generado desde los
+> controladores; regenerar con `npm run openapi`). En ejecución: `/docs` (UI) y `/docs-json`, fuera de
+> producción. Este documento es la guía narrativa (flujos y reglas); ante una discrepancia manda el
+> OpenAPI. Cambios de seguridad 2026-09-26: `authorize` responde **401** con el mismo mensaje si el
+> usuario no existe o la contraseña es incorrecta; `password-reset/request` responde siempre el mensaje
+> genérico.
+
 > Servicio: `ms-identity` | Puerto: `3000` (configurable vía `PORT`)
 > Última actualización: 2026-06-03
 
@@ -272,7 +279,7 @@ Set-Cookie: auth.refresh=<nuevoRefreshToken>; Path=/; HttpOnly; SameSite=Lax; Ma
 
 ---
 
-#### `GET /security/logout`
+#### `POST /security/logout`
 
 Destruye la sesión activa, invalida tokens y limpia ambas cookies.
 
@@ -425,7 +432,7 @@ Ejecuta el cambio de contraseña usando el token válido.
    ← Nueva cookie: auth.refresh
 
 6. Logout:
-   GET /security/logout
+   POST /security/logout
    ← Cookies eliminadas
 ```
 
@@ -442,7 +449,7 @@ Ejecuta el cambio de contraseña usando el token válido.
 | `POST` | `/security/authorize` | No | Paso 1 PKCE: validar credenciales |
 | `POST` | `/security/token` | No | Paso 2 PKCE: canjear code → sesión + cookies |
 | `POST` | `/security/session/refresh` | Cookie `auth.refresh` | Renovar sesión expirada |
-| `GET` | `/security/logout` | Cookie `auth.session` | Destruir sesión y limpiar cookies |
+| `POST` | `/security/logout` | Cookie `auth.session` | Destruir sesión y limpiar cookies |
 | `POST` | `/security/password-reset/request` | No | Solicitar email de recuperación |
 | `GET` | `/security/password-reset/validate` | No | Validar token de recuperación |
 | `POST` | `/security/password-reset/reset` | No | Ejecutar cambio de contraseña |

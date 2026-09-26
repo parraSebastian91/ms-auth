@@ -50,6 +50,12 @@ export class AuthAplicationService {
 
 
 
+    /** TTL del access token: los roles ADMIN y SUPER_ADMIN usan el TTL de administrador. */
+    accessTokenExpiresIn(roles: string[]): string {
+        const isAdmin = (roles ?? []).some(r => r === 'SUPER_ADMIN' || r === 'ADMIN');
+        return isAdmin ? this.adminExpiresIn : this.accessExpiresIn;
+    }
+
     /** validar que el usuario no tenga mas de 1 session por dispositivo y validar en cache antes que en db */
     public async createRefreshSession(
         sessionActive: AuthCodeStored,
@@ -79,8 +85,7 @@ export class AuthAplicationService {
             permissions: sessionActive.permisos,
             typeDevice: sessionActive.typeDevice
         }
-        const expireToken = (sessionActive.rol.includes('SUPER_ADMIN') || sessionActive.rol.includes('ADMIN')) ?
-            this.adminExpiresIn : this.accessExpiresIn;
+        const expireToken = this.accessTokenExpiresIn(sessionActive.rol);
         const accessToken = this.jwtService.sign(
             payload,
             { expiresIn: expireToken, secret: this.accessSecret } as JwtSignOptions);
@@ -96,7 +101,12 @@ export class AuthAplicationService {
         return { accessToken, refreshToken };
     }
 
-    public async rotateSession(SessionObject: AccessTokenPayload, meta?: { ip?: string, ua?: string, fingerprint?: string }): Promise<sessionHandler> {
+    /**
+     * Rota la sesión: revoca la actual y crea la siguiente enlazada por `rotation_parent_id`. El enlace es lo
+     * que permite distinguir después un refresh token ROTADO (su reutilización delata un robo) de uno cerrado por
+     * logout. `parentRowId` es el id (fila) de la sesión que se rota; si no se conoce se consulta por su uuid.
+     */
+    public async rotateSession(SessionObject: AccessTokenPayload, meta?: { ip?: string, ua?: string, fingerprint?: string }, parentRowId?: number | null): Promise<sessionHandler> {
         const t0 = performance.now();
         const lap = (label: string, prev: number) => {
             const ms = (performance.now() - prev).toFixed(1);
@@ -105,6 +115,8 @@ export class AuthAplicationService {
         };
         let t = t0;
         this.logger.log('ROTATE SESSION - INIT');
+
+        const parentId = parentRowId ?? (await this.refreshSessionRepo.findById(SessionObject.sessionUuid))?.id ?? null;
 
         await Promise.all([
             this.refreshSessionRepo.revokeById(SessionObject.sessionUuid),
@@ -118,6 +130,8 @@ export class AuthAplicationService {
         t = lap('hmac.hashTokenSecret', t);
 
         const oldSession = RefreshSessionModel.create({
+            id: parentId,
+            sessionUuid: SessionObject.sessionUuid,
             sessionId: SessionObject.sessionId,
             userId: SessionObject.userId,
             userUuid: SessionObject.userUuid,
@@ -198,6 +212,29 @@ export class AuthAplicationService {
         this.logger.log(`session revoked for userId: ${decodedJWT.userUuid}`);
 
         return revokedCount;
+    }
+
+    /**
+     * Cierra TODAS las sesiones de un usuario: las revoca en BD (el refresh token deja de servir) y
+     * borra sus access tokens de la caché (deja de pasar el guard sin esperar a que el JWT expire).
+     * La BD es obligatoria y su error se propaga; la caché es "mejor esfuerzo": si falla se registra,
+     * y el access token cacheado sigue vivo como máximo hasta su expiración.
+     */
+    async revokeAllUserSessions(userId: number | string): Promise<{ revoked: number; cacheCleared: number; cacheFailed: number }> {
+        const id = String(userId);
+        // Listar ANTES de revocar: la consulta solo devuelve sesiones no revocadas.
+        const active = await this.refreshSessionRepo.getSessionsByUserId(id);
+        const sessionIds = [...new Set(active.map(s => s.sessionId).filter(Boolean))];
+
+        const revoked = await this.refreshSessionRepo.revokeAllUserSessions(id);
+
+        const results = await Promise.allSettled(sessionIds.map(sid => this.cacheRepository.deleteAccessToken(sid)));
+        const cacheFailed = results.filter(r => r.status === 'rejected').length;
+        if (cacheFailed > 0) {
+            this.logger.error(`No se pudo borrar ${cacheFailed} access token(s) de la caché del usuario ${id}; expirarán solos.`);
+        }
+        this.logger.log(`Sesiones cerradas para userId=${id}: bd=${revoked} cache=${sessionIds.length - cacheFailed}`);
+        return { revoked, cacheCleared: sessionIds.length - cacheFailed, cacheFailed };
     }
 
     async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, CorrelationId: string): Promise<string> {

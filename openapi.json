@@ -1,0 +1,1496 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/security/authorize": {
+      "post": {
+        "operationId": "AuthorizationController_authorize",
+        "summary": "Paso 1: valida credenciales y emite un código de autorización",
+        "description": "El cliente genera un `code_verifier` aleatorio y envía su hash S256 como `code_challenge`. Devuelve una redirección por cada sistema al que el usuario tiene acceso; todas llevan el mismo código.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Código emitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Login exitoso"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string",
+                            "example": "/validate?code=abc&cid=xyz"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cuerpo inválido (campo obligatorio ausente o typeDevice desconocido).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Usuario o contraseña incorrectos (mismo error si el usuario no existe).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El correo aún no está verificado. El cuerpo NO usa el sobre estándar: `{ code: \"EMAIL_NOT_VERIFIED\", email }`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 403
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Email no verificado"
+                    },
+                    "data": {
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados intentos (por IP o por usuario). Cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Autorización (Authorization Code + PKCE)"
+        ]
+      }
+    },
+    "/security/token": {
+      "post": {
+        "operationId": "AuthorizationController_token",
+        "summary": "Paso 2: canjea el código (+ code_verifier) por la sesión",
+        "description": "Verifica PKCE y el tipo de dispositivo, consume el código (un solo uso), marca la sesión como autenticada (cookie `auth.session`) y fija la cookie HttpOnly `auth.refresh`.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión establecida.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "auth.refresh (HttpOnly, SameSite=Lax) y auth.session.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Callback exitoso"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Autenticación exitosa"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Código inexistente/consumido, verifier PKCE inválido o dispositivo distinto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Autorización (Authorization Code + PKCE)"
+        ]
+      }
+    },
+    "/security/session/refresh": {
+      "post": {
+        "operationId": "SessionController_refresh",
+        "summary": "Renueva la sesión rotando el refresh token",
+        "description": "Lee la cookie `auth.refresh`, revoca la sesión anterior y devuelve una nueva cookie de refresh. Un refresh token ya rotado da 401.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshSessionRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión renovada (cookie `auth.refresh` nueva).",
+            "headers": {
+              "Set-Cookie": {
+                "description": "auth.refresh renovada.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Sesión renovada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token ausente, inválido, expirado o revocado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Sesión"
+        ],
+        "security": [
+          {
+            "refresh": []
+          }
+        ]
+      }
+    },
+    "/security/logout": {
+      "post": {
+        "operationId": "SessionController_logout",
+        "summary": "Cierra la sesión",
+        "description": "Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Es POST (cambia estado): la cookie de sesión es SameSite=Lax, por lo que otro sitio no puede cerrar la sesión del usuario.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sesión cerrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Logout exitoso"
+                    },
+                    "data": {
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Sesión"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/security/password-reset/request": {
+      "post": {
+        "operationId": "PasswordResetController_request",
+        "summary": "Solicita el enlace de restablecimiento",
+        "description": "Responde siempre el mismo mensaje genérico (exista o no el correo, esté o no activa la cuenta). Estado actual: el envío del correo aún NO está implementado.",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitud aceptada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Si el correo existe, recibirás un enlace de restablecimiento"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Correo con formato inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes (por IP o por correo). Cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Recuperación de contraseña"
+        ]
+      }
+    },
+    "/security/password-reset/validate": {
+      "get": {
+        "operationId": "PasswordResetController_validate",
+        "summary": "Comprueba si el token del enlace sigue siendo válido",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "description": "Token del enlace de restablecimiento.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uuid",
+            "required": true,
+            "in": "query",
+            "description": "Uuid del token de restablecimiento (parámetro `uuid` del enlace).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de la validación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Recuperación de contraseña"
+        ]
+      }
+    },
+    "/security/password-reset/reset": {
+      "post": {
+        "operationId": "PasswordResetController_reset",
+        "summary": "Establece la nueva contraseña con el token del enlace",
+        "description": "Marca el token como usado y revoca las sesiones del usuario en base de datos.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contraseña restablecida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Contraseña restablecida exitosamente"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Contraseñas distintas, token inválido o expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Recuperación de contraseña"
+        ]
+      }
+    },
+    "/registro/check/{field}": {
+      "get": {
+        "operationId": "RegistroController_getRegistro",
+        "summary": "Comprueba si un campo (p. ej. username o correo) está disponible",
+        "parameters": [
+          {
+            "name": "field",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "username",
+              "type": "string"
+            }
+          },
+          {
+            "name": "value",
+            "required": true,
+            "in": "query",
+            "description": "Valor a comprobar.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disponibilidad del valor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas comprobaciones desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registro"
+        ]
+      }
+    },
+    "/registro": {
+      "post": {
+        "operationId": "RegistroController_createRegistro",
+        "summary": "Registra un usuario; envía un código OTP al correo para verificarlo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormRegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registro creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos o usuario/correo ya registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados registros desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registro"
+        ]
+      }
+    },
+    "/registro/verificar-email": {
+      "post": {
+        "operationId": "RegistroController_verificarEmail",
+        "summary": "Verifica el correo con el código OTP de 6 dígitos",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificarEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correo verificado; ya se puede iniciar sesión."
+          },
+          "400": {
+            "description": "Código inválido o vencido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados intentos (por IP o por correo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registro"
+        ]
+      }
+    },
+    "/registro/resend-otp": {
+      "post": {
+        "operationId": "RegistroController_resendOtp",
+        "summary": "Reenvía el código OTP",
+        "description": "Responde siempre lo mismo y en el mismo tiempo (correo desconocido, ya verificado o pendiente): no revela si el correo existe. El envío ocurre en segundo plano.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitud aceptada."
+          },
+          "429": {
+            "description": "Demasiados reenvíos (por IP o por correo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registro"
+        ]
+      }
+    },
+    "/usuario/profile/{uuid}": {
+      "get": {
+        "operationId": "UserProfileController_getProfile",
+        "summary": "Perfil (identidad + contacto + roles) de un usuario",
+        "description": "Permiso requerido: USR_VIEW. Solo el propio usuario o SUPER_ADMIN/ADMIN.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil del usuario.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Extraccion exitosa"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfileDTO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "uuid con formato inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el JWT Bearer o es inválido/expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Falta el permiso USR_VIEW o el perfil es de otro usuario.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Perfil de usuario"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "UserProfileController_updateProfile",
+        "summary": "Actualiza el contacto del usuario (parcial)",
+        "description": "Solo se modifican los campos enviados. Permiso requerido: USR_VIEW. Solo el propio usuario (bajo RLS) o SUPER_ADMIN/ADMIN.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Actualizacion exitosa"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfileDTO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "uuid, correo o nombre inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el JWT Bearer o es inválido/expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Falta el permiso USR_VIEW o el perfil es de otro usuario.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Perfil de usuario"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "summary": "Estado detallado (base de datos, memoria y disco)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "summary": "Readiness: el servicio está listo para recibir tráfico",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "summary": "Liveness: el proceso está vivo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "ms-identity",
+    "description": "Identidad y autenticación de SEIS App: Authorization Code + PKCE, ciclo de sesión, recuperación de contraseña, registro y perfil de usuario.\n\n**Flujo de login**: `POST /security/authorize` (credenciales + code_challenge) → código → `POST /security/token` (código + code_verifier) → cookies `auth.session` y `auth.refresh`. Las rutas de perfil usan el JWT de acceso como Bearer.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "auth.session"
+      },
+      "refresh": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "auth.refresh"
+      }
+    },
+    "schemas": {
+      "AuthorizeRequestDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "sparra"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          },
+          "code_challenge": {
+            "type": "string",
+            "description": "PKCE: BASE64URL(SHA256(code_verifier)), método S256."
+          },
+          "typeDevice": {
+            "type": "string",
+            "enum": [
+              "WEB",
+              "DESKTOP",
+              "MOBILE",
+              "POSTMAN"
+            ]
+          },
+          "CorrelationId": {
+            "type": "string",
+            "description": "Id de correlación de este intento; debe repetirse como `cid` en /security/token."
+          }
+        },
+        "required": [
+          "CorrelationId",
+          "code_challenge",
+          "password",
+          "typeDevice",
+          "username"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number",
+            "example": 401
+          },
+          "message": {
+            "type": "string",
+            "example": "Usuario o contraseña incorrectos"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ]
+      },
+      "TokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Código de autorización devuelto por /security/authorize (un solo uso)."
+          },
+          "typeDevice": {
+            "type": "string",
+            "enum": [
+              "WEB",
+              "DESKTOP",
+              "MOBILE",
+              "POSTMAN"
+            ],
+            "description": "Debe coincidir con el usado en /security/authorize."
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "PKCE: el code_verifier original cuyo hash se envió como code_challenge."
+          },
+          "cid": {
+            "type": "string",
+            "description": "CorrelationId enviado en /security/authorize."
+          }
+        },
+        "required": [
+          "code",
+          "typeDevice",
+          "codeVerifier",
+          "cid"
+        ]
+      },
+      "RefreshSessionRequestDto": {
+        "type": "object",
+        "properties": {
+          "typeDevice": {
+            "type": "string",
+            "example": "WEB",
+            "description": "Solo informativo (se usa en logs)."
+          }
+        }
+      },
+      "RequestPasswordResetDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "example": "ana@correo.cl"
+          }
+        },
+        "required": [
+          "correo"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "format": "password"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "format": "password",
+            "description": "Debe ser igual a newPassword."
+          }
+        },
+        "required": [
+          "token",
+          "uuid",
+          "newPassword",
+          "confirmPassword"
+        ]
+      },
+      "FormRegisterDto": {
+        "type": "object",
+        "properties": {
+          "rol": {
+            "type": "string",
+            "enum": [
+              "USUARIO_STANDARD",
+              "CEDENTE",
+              "CEDENTE_ADM",
+              "EJECUTIVO",
+              "EJECUTIVO_ADM"
+            ],
+            "description": "Rol inicial solicitado (el rol efectivo se asigna al verificar el correo)."
+          },
+          "email": {
+            "type": "string",
+            "example": "ana@correo.cl"
+          },
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "example": "ana.perez"
+          },
+          "nombres": {
+            "type": "string",
+            "minLength": 2
+          },
+          "apellidoPaterno": {
+            "type": "string",
+            "minLength": 2
+          },
+          "apellidoMaterno": {
+            "type": "string",
+            "minLength": 2
+          },
+          "telefono": {
+            "type": "string",
+            "minLength": 7,
+            "maxLength": 20,
+            "example": "+56912345678"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "DNI",
+              "RUT",
+              "PASAPORTE"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "example": "12345678-9"
+          },
+          "pais": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "example": "CL",
+            "description": "Código ISO de 2 letras."
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "format": "date",
+            "example": "1990-05-31"
+          },
+          "direccion": {
+            "type": "string",
+            "minLength": 5
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "format": "password"
+          }
+        },
+        "required": [
+          "rol",
+          "email",
+          "username",
+          "nombres",
+          "apellidoPaterno",
+          "apellidoMaterno",
+          "telefono",
+          "tipoDocumento",
+          "numeroDocumento",
+          "pais",
+          "fechaNacimiento",
+          "direccion",
+          "password"
+        ]
+      },
+      "VerificarEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ana@correo.cl"
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6,
+            "example": "123456"
+          }
+        },
+        "required": [
+          "email",
+          "otp"
+        ]
+      },
+      "ResendOtpDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ana@correo.cl"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "UserProfileDTO": {
+        "type": "object",
+        "properties": {
+          "usuario_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "ingreso": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Fecha de alta."
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "nombres": {
+            "type": "string"
+          },
+          "apellido_paterno": {
+            "type": "string"
+          },
+          "apellido_materno": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "celular": {
+            "type": "string",
+            "nullable": true
+          },
+          "correo": {
+            "type": "string"
+          },
+          "fecha_nacimiento": {
+            "format": "date",
+            "type": "string",
+            "nullable": true
+          },
+          "redes_sociales": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "tipo_documento": {
+            "type": "string",
+            "nullable": true,
+            "example": "RUT"
+          },
+          "numero_documento": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo_contacto": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "example": [
+              "CLIENTE_CEDENTE"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "usuario_uuid",
+          "username",
+          "ingreso",
+          "activo",
+          "nombres",
+          "apellido_paterno",
+          "apellido_materno",
+          "direccion",
+          "celular",
+          "correo",
+          "fecha_nacimiento",
+          "redes_sociales",
+          "tipo_documento",
+          "numero_documento",
+          "tipo_contacto",
+          "roles"
+        ]
+      },
+      "NombreDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string"
+          },
+          "apellidoPaterno": {
+            "type": "string"
+          },
+          "apellidoMaterno": {
+            "type": "string"
+          }
+        }
+      },
+      "DatosContactoDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "example": "ana@correo.cl"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "ubicacion": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateUserProfileRequestDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "$ref": "#/components/schemas/NombreDto"
+          },
+          "datosContacto": {
+            "$ref": "#/components/schemas/DatosContactoDto"
+          }
+        }
+      }
+    }
+  }
+}

@@ -3,12 +3,19 @@ import * as bcrypt from 'bcrypt';
 import { EmailNotVerifiedError } from 'src/core/domain/errors/EmailNotVerified.error';
 import { InvalidcodeToken } from 'src/core/domain/errors/InvalidCodeToken.error';
 import { LoginError } from 'src/core/domain/errors/LoginError.error';
-import { UserNotFoundError } from 'src/core/domain/errors/UserNotFound.error';
 import { IAuthorizationUseCase } from 'src/core/domain/puertos/inbound/IAuthorizationUseCase.interface';
 import { ICacheRepository } from 'src/core/domain/puertos/outbound/CacheRepository.interface';
 import { IUsuarioRepository } from './../../../domain/puertos/outbound/iUsuarioRepository.interface';
 import { AuthAplicationService } from './../../service/auth.service';
+import { maskIdentifier } from 'src/core/share/log-sanitizer';
 import { AuthorizeCommand, TokenCommand } from './../auth/command/AuthCommand.interface';
+
+/**
+ * Hash bcrypt de una contraseña inexistente. Se compara cuando el usuario no existe para que
+ * "usuario inexistente" y "contraseña incorrecta" tarden lo mismo y den el mismo error.
+ */
+const DUMMY_PASSWORD_HASH = '$2b$10$Nar53hrNaaKAWiDNHglNSuh5bq8P2timogL7hDJkEI3ahMazt.X2K';
+const INVALID_CREDENTIALS = 'Usuario o contraseña incorrectos';
 
 /** Authorization Code + PKCE: `authorize` emite el código, `token` lo canjea por tokens. */
 @Injectable()
@@ -26,27 +33,28 @@ export class AuthorizationUseCase implements IAuthorizationUseCase {
   ): Promise<{ code: string; url: string }[]> {
     const requestId = command.requestId || 'N/A';
     this.logger.log(
-      `[AUTHORIZE] INIT requestId=${requestId} username=${command.username} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`,
+      `[AUTHORIZE] INIT requestId=${requestId} username=${maskIdentifier(command.username)} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`,
     );
     const usuario = await this.usuarioRepository.getUsuarioByUsername(
       command.username,
     );
     if (!usuario) {
+      await bcrypt.compare(command.password, DUMMY_PASSWORD_HASH);
       this.logger.warn(
-        `[AUTHORIZE] USER_NOT_FOUND requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] USER_NOT_FOUND requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
-      throw new UserNotFoundError('Usuario no encontrado');
+      throw new LoginError(INVALID_CREDENTIALS);
     }
     if (!(await bcrypt.compare(command.password, usuario.password))) {
       this.logger.warn(
-        `[AUTHORIZE] INVALID_CREDENTIALS requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] INVALID_CREDENTIALS requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
-      throw new LoginError('Usuario no encontrado o contraseña incorrecta');
+      throw new LoginError(INVALID_CREDENTIALS);
     }
     if (!usuario.emailVerificado) {
       const email = usuario.contacto?.correo ?? command.username;
       this.logger.warn(
-        `[AUTHORIZE] EMAIL_NOT_VERIFIED requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] EMAIL_NOT_VERIFIED requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
       throw new EmailNotVerifiedError(email);
     }
@@ -71,7 +79,7 @@ export class AuthorizationUseCase implements IAuthorizationUseCase {
       url: `/validate?code=${encodeURIComponent(code)}&cid=${encodeURIComponent(command.CorrelationId)}`,
     }));
     this.logger.log(
-      `[AUTHORIZE] SUCCESS requestId=${requestId} username=${command.username} systems=${uris.length}`,
+      `[AUTHORIZE] SUCCESS requestId=${requestId} username=${maskIdentifier(command.username)} systems=${uris.length}`,
     );
     return uris;
   }

@@ -6,6 +6,9 @@ https://docs.nestjs.com/modules
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { createThrottlerOptions } from './rate-limit/rate-limit';
+import { createThrottlerStorage } from './rate-limit/throttler-storage';
 import { TerminusModule } from '@nestjs/terminus';
 import { AuthorizationController } from './controllers/authorization.controller';
 import { SessionController } from './controllers/session.controller';
@@ -22,6 +25,11 @@ import { PermissionsGuard } from './guards/permissions.guard';
 @Module({
   imports: [
     TerminusModule,
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createThrottlerOptions(createThrottlerStorage(config)),
+    }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

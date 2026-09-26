@@ -1,7 +1,6 @@
 import { EmailNotVerifiedError } from 'src/core/domain/errors/EmailNotVerified.error';
 import { InvalidcodeToken } from 'src/core/domain/errors/InvalidCodeToken.error';
 import { LoginError } from 'src/core/domain/errors/LoginError.error';
-import { UserNotFoundError } from 'src/core/domain/errors/UserNotFound.error';
 import { AUTHORIZATION_USE_CASE } from 'src/core/domain/puertos/inbound/IAuthorizationUseCase.interface';
 import { createHttpApp } from 'src/test-support/http-app';
 import { AuthorizationController } from './authorization.controller';
@@ -46,13 +45,12 @@ describe('AuthorizationController', () => {
       expect((await http().post('/security/authorize').send({ ...authorizeBody, typeDevice: 'TOSTADORA' })).status).toBe(400);
     });
 
-    it.each([
-      [new LoginError('mala'), 400],
-      [new UserNotFoundError('no está'), 404],
-    ])('traduce %p a %i y cuenta el intento como fallido', async (error, status) => {
+    it('credenciales inválidas → 401 (lo que el login del SPA interpreta como "usuario o contraseña incorrectos") y cuenta el intento fallido', async () => {
       const { http, useCase, metrics } = await setup();
-      useCase.ExecuteAuthorize.mockRejectedValue(error);
-      expect((await http().post('/security/authorize').send(authorizeBody)).status).toBe(status);
+      useCase.ExecuteAuthorize.mockRejectedValue(new LoginError('Usuario o contraseña incorrectos'));
+      const res = await http().post('/security/authorize').send(authorizeBody);
+      expect(res.status).toBe(401);
+      expect(res.body.message).toBe('Usuario o contraseña incorrectos');
       expect(metrics.loginAttempt).toHaveBeenCalledWith('failure');
     });
 
@@ -100,11 +98,11 @@ describe('AuthorizationController', () => {
       expect(useCase.ExecuteToken).toHaveBeenCalledWith(expect.objectContaining({ code: 'abc', codeVerifier: 'ver', sessionId: 'sess-1', CorrelationId: 'cid-1' }));
     });
 
-    it('DOCUMENTA: si la cookie auth.session trae otro id que la sesión actual, prevalece el de la cookie', async () => {
+    it('ignora el id que trae la cookie auth.session: usa siempre el id de la sesión verificada', async () => {
       const { http, useCase } = await setup();
       useCase.ExecuteToken.mockResolvedValue(okTokens);
-      await http().post('/security/token').set('Cookie', 'auth.session=s:otro-id.firma').send(tokenBody);
-      expect(useCase.ExecuteToken).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'otro-id' }));
+      await http().post('/security/token').set('Cookie', 'auth.session=s:id-elegido-por-el-cliente.firma').send(tokenBody);
+      expect(useCase.ExecuteToken).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'sess-1' }));
     });
 
     it.each(['mal-formada', 's:', ''])('una cookie auth.session mal formada (%p) no provoca 500: se usa la sesión actual', async (value) => {

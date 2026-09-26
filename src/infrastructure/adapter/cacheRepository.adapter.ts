@@ -12,6 +12,7 @@ export class CacheRepositoryAdapter implements ICacheRepository {
         authCode:     (code: string)     => `auth_code:${code}`,
         session:      (sessionId: string) => `session:${sessionId}`,
         emailVerify:  (userUuid: string)  => `email_verify:${userUuid}`,
+        emailVerifyAttempts: (userUuid: string) => `email_verify_attempts:${userUuid}`,
     }
 
     constructor(
@@ -65,6 +66,17 @@ export class CacheRepositoryAdapter implements ICacheRepository {
         const key = this.key.emailVerify(userUuid);
         const data = await this.cacheManager.get<string>(key);
         return data ?? null;
+    }
+
+    async incrementEmailVerificationAttempts(userUuid: string): Promise<number> {
+        const key = this.key.emailVerifyAttempts(userUuid);
+        const attempts = ((await this.cacheManager.get<number>(key)) ?? 0) + 1;
+        await this.cacheManager.set(key, attempts, this.EMAIL_VERIFY_TTL_MS);
+        return attempts;
+    }
+
+    async clearEmailVerificationAttempts(userUuid: string): Promise<void> {
+        await this.cacheManager.del(this.key.emailVerifyAttempts(userUuid));
     }
 
     async deleteEmailVerificationCode(userUuid: string): Promise<void> {
