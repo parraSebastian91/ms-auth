@@ -5,6 +5,8 @@ import { IPasswordResetUseCase } from 'src/core/domain/puertos/inbound/IPassword
 import { IContactoRepository } from 'src/core/domain/puertos/outbound/iContactoRepository.interface';
 import { IEmailService } from 'src/core/domain/puertos/outbound/IEmailService.interface';
 import { IPasswordResetRepository } from 'src/core/domain/puertos/outbound/IPasswordResetRepository.interface';
+import { BackgroundTasks } from 'src/core/share/background-tasks';
+import { GENERIC_MESSAGES } from 'src/core/share/generic-messages';
 import { maskEmail } from 'src/core/share/log-sanitizer';
 import { IUsuarioRepository } from './../../../domain/puertos/outbound/iUsuarioRepository.interface';
 import { AuthAplicationService } from './../../service/auth.service';
@@ -18,7 +20,7 @@ import {
 @Injectable()
 export class PasswordResetUseCase implements IPasswordResetUseCase, OnModuleDestroy {
   private readonly logger = new Logger(PasswordResetUseCase.name);
-  private readonly pending = new Set<Promise<void>>();
+  private readonly background = new BackgroundTasks(this.logger);
 
   constructor(
     private usuarioRepository: IUsuarioRepository,
@@ -43,9 +45,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase, OnModuleDest
       `[PASSWORD_RESET_REQUEST] INIT requestId=${requestId} email=${maskEmail(command.correo)}`,
     );
     const contacto = await this.contactoRepository.findByCorreo(command.correo);
-    const genericResponse = {
-      message: 'Si el correo existe, recibirás un enlace de restablecimiento',
-    };
+    const genericResponse = { message: GENERIC_MESSAGES.passwordResetRequested };
 
     if (!contacto) {
       this.logger.warn(
@@ -61,27 +61,20 @@ export class PasswordResetUseCase implements IPasswordResetUseCase, OnModuleDest
       return genericResponse;
     }
 
-    this.runInBackground(`PASSWORD_RESET_REQUEST requestId=${requestId}`, () =>
+    this.background.run(`PASSWORD_RESET_REQUEST requestId=${requestId}`, () =>
       this.issueResetToken(command, contacto, requestId),
     );
     return genericResponse;
   }
 
   /** Espera a que termine el trabajo en segundo plano (pruebas y apagado ordenado). */
-  async whenIdle(): Promise<void> {
-    while (this.pending.size > 0) await Promise.allSettled([...this.pending]);
+  whenIdle(): Promise<void> {
+    return this.background.whenIdle();
   }
 
   /** Al apagar, no perder correos de restablecimiento que aún se estén emitiendo. */
   async onModuleDestroy(): Promise<void> {
     await this.whenIdle();
-  }
-
-  private runInBackground(label: string, task: () => Promise<void>): void {
-    const promise: Promise<void> = task()
-      .catch((error: any) => this.logger.error(`[${label}] BACKGROUND_FAILED: ${error?.message ?? error}`))
-      .finally(() => this.pending.delete(promise));
-    this.pending.add(promise);
   }
 
   private async issueResetToken(command: RequestPasswordResetCommand, contacto: any, requestId: string): Promise<void> {

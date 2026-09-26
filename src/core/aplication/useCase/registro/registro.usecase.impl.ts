@@ -6,7 +6,9 @@ import { IUsuarioRepository } from "src/core/domain/puertos/outbound/iUsuarioRep
 import { ICacheRepository } from "src/core/domain/puertos/outbound/CacheRepository.interface";
 import { IEmailService } from "src/core/domain/puertos/outbound/IEmailService.interface";
 import { RegistroUsuarioModel } from "src/core/domain/model/registroUsuario.model";
-import { Logger } from "@nestjs/common";
+import { Logger, OnModuleDestroy } from "@nestjs/common";
+import { BackgroundTasks } from "src/core/share/background-tasks";
+import { maskEmail } from "src/core/share/log-sanitizer";
 import * as bcrypt from 'bcrypt';
 import { IRolRepository } from "src/core/domain/puertos/outbound/iRolRepository.interface";
 import { rolEnum } from "src/core/domain/model/constantes.model";
@@ -16,8 +18,9 @@ const VERIFICATION_CODE_TTL_MIN = 10;
 /** Intentos fallidos permitidos por código: con 6 dígitos, sin tope se adivina por fuerza bruta. */
 export const MAX_OTP_ATTEMPTS = 5;
 
-export class RegistroUseCaseImpl implements IRegistroUseCase {
+export class RegistroUseCaseImpl implements IRegistroUseCase, OnModuleDestroy {
     private readonly logger = new Logger(RegistroUseCaseImpl.name);
+    private readonly background = new BackgroundTasks(this.logger);
 
     constructor(
         private readonly usuarioRepository: IUsuarioRepository,
@@ -57,18 +60,9 @@ export class RegistroUseCaseImpl implements IRegistroUseCase {
             const { usuarioUuid } = await this.usuarioRepository.createUsuario(registroUsuarioModel);
             if (!usuarioUuid) throw new Error('No se pudo crear el usuario');
 
-            // Generar código de 6 dígitos y almacenarlo hasheado en Redis
-            const code = this.generateVerificationCode();
-            const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-            await this.cacheRepository.setEmailVerificationCode(usuarioUuid, codeHash);
-            await this.cacheRepository.clearEmailVerificationAttempts(usuarioUuid);
-
-            // Enviar código (consola ahora, SMTP/SendGrid en producción)
-            await this.emailService.sendVerificationCode(
-                data.email.getValue(),
-                code,
-                data.nombres
-            );
+            // Generar el código de 6 dígitos, guardarlo hasheado y enviarlo (consola ahora, SMTP/SendGrid después).
+            // Aquí se espera: si falla, el alta entera se revierte (rollback del contacto).
+            await this.storeAndSendVerificationCode(usuarioUuid, data.email.getValue(), data.nombres);
 
             this.logger.log(`[REGISTRO] Código de verificación generado | userUuid=${usuarioUuid} | TTL=${VERIFICATION_CODE_TTL_MIN}min`);
             return { success: true };
@@ -126,24 +120,42 @@ export class RegistroUseCaseImpl implements IRegistroUseCase {
         return await this.usuarioRepository.validateField(field, value);
     }
 
+    /**
+     * Anti-enumeración (mismo criterio que password-reset/request): responde SIEMPRE éxito y en el mismo tiempo,
+     * sea el correo desconocido, ya verificado o pendiente. Antes de responder solo se hace la búsqueda del usuario;
+     * el bcrypt, la caché y el envío corren en segundo plano y solo para cuentas pendientes de verificar.
+     */
     async executeResendOtp(email: string): Promise<{ success: boolean; message?: string }> {
         const usuario = await this.usuarioRepository.getUsuarioByEmail(email);
-        if (!usuario) {
-            // No revelar si el email existe o no (evita enumeración)
+        if (!usuario || usuario.emailVerificado) {
+            this.logger.warn(`[RESEND_OTP] SIN_ENVIO email=${maskEmail(email)} motivo=${usuario ? 'YA_VERIFICADO' : 'DESCONOCIDO'}`);
             return { success: true };
         }
-        if (usuario.emailVerificado) {
-            return { success: false, message: 'Este correo ya fue verificado.' };
-        }
 
+        this.background.run(`RESEND_OTP userUuid=${usuario.uuid}`, async () => {
+            await this.storeAndSendVerificationCode(usuario.uuid, email, usuario.nombres);
+            this.logger.log(`[RESEND_OTP] Código reenviado | userUuid=${usuario.uuid}`);
+        });
+        return { success: true };
+    }
+
+    /** Espera al trabajo en segundo plano (pruebas y apagado ordenado). */
+    whenIdle(): Promise<void> {
+        return this.background.whenIdle();
+    }
+
+    /** Al apagar, no perder códigos que aún se estén enviando. */
+    async onModuleDestroy(): Promise<void> {
+        await this.whenIdle();
+    }
+
+    /** Código nuevo: se guarda hasheado, se reinicia el contador de intentos y se envía por correo. */
+    private async storeAndSendVerificationCode(userUuid: string, email: string, nombres: string): Promise<void> {
         const code = this.generateVerificationCode();
         const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-        await this.cacheRepository.setEmailVerificationCode(usuario.uuid, codeHash);
-        await this.cacheRepository.clearEmailVerificationAttempts(usuario.uuid);
-        await this.emailService.sendVerificationCode(email, code, usuario.nombres);
-
-        this.logger.log(`[RESEND_OTP] Código reenviado | userUuid=${usuario.uuid}`);
-        return { success: true };
+        await this.cacheRepository.setEmailVerificationCode(userUuid, codeHash);
+        await this.cacheRepository.clearEmailVerificationAttempts(userUuid);
+        await this.emailService.sendVerificationCode(email, code, nombres);
     }
 
     private generateVerificationCode(): string {

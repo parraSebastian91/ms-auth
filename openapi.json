@@ -652,7 +652,8 @@
     "/registro/resend-otp": {
       "post": {
         "operationId": "RegistroController_resendOtp",
-        "summary": "Reenvía el código OTP (respuesta genérica: no revela si el correo existe)",
+        "summary": "Reenvía el código OTP",
+        "description": "Responde siempre lo mismo y en el mismo tiempo (correo desconocido, ya verificado o pendiente): no revela si el correo existe. El envío ocurre en segundo plano.",
         "parameters": [],
         "requestBody": {
           "required": true,

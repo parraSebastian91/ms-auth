@@ -11,6 +11,7 @@ import { AuthThrottlerGuard } from '../rate-limit/auth-throttler.guard';
 import { IsNotEmpty, IsString, Length, IsEmail } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import { GENERIC_MESSAGES } from 'src/core/share/generic-messages';
 import { maskEmail, maskIdentifier } from 'src/core/share/log-sanitizer';
 import { Counter } from 'prom-client';
 
@@ -113,7 +114,10 @@ export class RegistroController {
     @HttpCode(200)
     @Throttle(RATE_LIMITS.resendOtp)
     @ApiErrorResponse(429, 'Demasiados reenvíos (por IP o por correo).')
-    @ApiOperation({ summary: 'Reenvía el código OTP (respuesta genérica: no revela si el correo existe)' })
+    @ApiOperation({
+        summary: 'Reenvía el código OTP',
+        description: 'Responde siempre lo mismo y en el mismo tiempo (correo desconocido, ya verificado o pendiente): no revela si el correo existe. El envío ocurre en segundo plano.',
+    })
     @ApiOkResponse({ description: 'Solicitud aceptada.' })
     async resendOtp(
         @Body() body: ResendOtpDto,
@@ -124,7 +128,7 @@ export class RegistroController {
         if (!result.success) {
             return res.status(400).json({ message: result.message });
         }
-        return res.status(200).json({ message: "Si el correo existe y no fue verificado, recibirás un nuevo código." });
+        return res.status(200).json({ message: GENERIC_MESSAGES.otpResent });
     }
 
 }

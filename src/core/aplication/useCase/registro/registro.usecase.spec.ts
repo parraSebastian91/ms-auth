@@ -134,17 +134,40 @@ describe('RegistroUseCaseImpl', () => {
     });
   });
 
-  describe('executeResendOtp', () => {
-    it('correo desconocido → éxito silencioso, sin enviar nada (anti-enumeración)', async () => {
+  describe('executeResendOtp (anti-enumeración)', () => {
+    const verificado = { id: 7, uuid: UUID, emailVerificado: true, nombres: 'Ana' };
+
+    it('correo desconocido → éxito uniforme, sin enviar nada', async () => {
       const s = setup({ usuario: null });
       await expect(s.uc.executeResendOtp('x@test.cl')).resolves.toEqual({ success: true });
+      await s.uc.whenIdle();
       expect(s.emailService.sendVerificationCode).not.toHaveBeenCalled();
     });
 
-    it('correo ya verificado → mensaje y sin envío', async () => {
-      const s = setup({ usuario: { id: 7, uuid: UUID, emailVerificado: true, nombres: 'Ana' } });
-      await expect(s.uc.executeResendOtp('ana@test.cl')).resolves.toEqual({ success: false, message: 'Este correo ya fue verificado.' });
+    it('correo ya verificado → MISMA respuesta que el resto (no revela el estado) y sin envío', async () => {
+      const s = setup({ usuario: verificado });
+      await expect(s.uc.executeResendOtp('ana@test.cl')).resolves.toEqual({ success: true });
+      await s.uc.whenIdle();
       expect(s.emailService.sendVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('la respuesta es idéntica para desconocido, verificado y pendiente', async () => {
+      const respuestas = [];
+      for (const usuario of [null, verificado, undefined]) {
+        const s = setup({ usuario });
+        respuestas.push(await s.uc.executeResendOtp('ana@test.cl'));
+        await s.uc.whenIdle();
+      }
+      expect(new Set(respuestas.map(r => JSON.stringify(r))).size).toBe(1);
+    });
+
+    it('al responder solo se hizo la búsqueda: bcrypt, caché y envío ocurren en segundo plano', async () => {
+      const s = setup();
+      await s.uc.executeResendOtp('ana@test.cl');
+      expect(s.emailService.sendVerificationCode).not.toHaveBeenCalled();
+      expect(s.cache.emailCodes.has(UUID)).toBe(false);
+      await s.uc.whenIdle();
+      expect(s.emailService.sendVerificationCode).toHaveBeenCalledTimes(1);
     });
 
     it('emite un código NUEVO (reemplaza el anterior) y reinicia el contador de intentos', async () => {
@@ -152,11 +175,27 @@ describe('RegistroUseCaseImpl', () => {
       const old = await withCode(s, '111111');
       s.cache.attempts.set(UUID, 4);
       await expect(s.uc.executeResendOtp('ana@test.cl')).resolves.toEqual({ success: true });
+      await s.uc.whenIdle();
 
       const newCode = s.emailService.sendVerificationCode.mock.calls[0][1];
       expect(await bcrypt.compare(newCode, s.cache.emailCodes.get(UUID)!)).toBe(true);
       expect(old).not.toBe(newCode);
       expect(s.cache.attempts.has(UUID)).toBe(false);
+    });
+
+    it('si falla el envío no se propaga: la respuesta sigue siendo la genérica', async () => {
+      const s = setup();
+      s.emailService.sendVerificationCode.mockRejectedValue(new Error('smtp caído'));
+      jest.spyOn(require('@nestjs/common').Logger.prototype, 'error').mockImplementation(() => undefined);
+      await expect(s.uc.executeResendOtp('ana@test.cl')).resolves.toEqual({ success: true });
+      await expect(s.uc.whenIdle()).resolves.toBeUndefined();
+    });
+
+    it('onModuleDestroy espera a los envíos pendientes', async () => {
+      const s = setup();
+      await s.uc.executeResendOtp('ana@test.cl');
+      await s.uc.onModuleDestroy();
+      expect(s.emailService.sendVerificationCode).toHaveBeenCalledTimes(1);
     });
   });
 });
