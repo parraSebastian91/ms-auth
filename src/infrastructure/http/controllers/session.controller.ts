@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters } from '@nestjs/common';
+import { ApiCookieAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { refreshSessionCommand } from 'src/core/aplication/useCase/auth/command/AuthCommand.interface';
 import { ISessionUseCase, SESSION_USE_CASE } from 'src/core/domain/puertos/inbound/ISessionUseCase.interface';
@@ -7,11 +8,13 @@ import { AuthMetricsService } from 'src/infrastructure/metrics/auth-metrics.serv
 import { Public } from '../decorators/public.decorator';
 import { ApiResponse } from '../model/api-response.model';
 import { RefreshSessionRequestDto } from '../model/dto/auth.dto';
+import { ApiEnvelopeResponse, ApiErrorResponse } from '../openapi/api-envelope';
 import { clearAuthCookies, setRefreshCookie } from '../support/auth-cookies';
 import { getRequestId } from '../support/request-id';
 import { destroySession, establishAuthenticatedSession, HttpSession } from '../support/session-store';
 
 /** Ciclo de vida de la sesión: renovar (rotar el refresh token) y cerrar. */
+@ApiTags('Sesión')
 @Controller('security')
 @UseFilters(CoreExceptionFilter)
 export class SessionController {
@@ -25,6 +28,17 @@ export class SessionController {
   @Post('session/refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('refresh')
+  @ApiOperation({
+    summary: 'Renueva la sesión rotando el refresh token',
+    description: 'Lee la cookie `auth.refresh`, revoca la sesión anterior y devuelve una nueva cookie de refresh. Un refresh token ya rotado da 401.',
+  })
+  @ApiOkResponse({
+    description: 'Sesión renovada (cookie `auth.refresh` nueva).',
+    schema: { type: 'object', properties: { message: { type: 'string', example: 'Sesión renovada' } } },
+    headers: { 'Set-Cookie': { description: 'auth.refresh renovada.', schema: { type: 'string' } } },
+  })
+  @ApiErrorResponse(401, 'Refresh token ausente, inválido, expirado o revocado.')
   async refresh(
     @Body() body: RefreshSessionRequestDto,
     @Session() session: HttpSession,
@@ -47,6 +61,13 @@ export class SessionController {
   @Get('logout')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('session')
+  @ApiOperation({
+    summary: 'Cierra la sesión',
+    description: 'Revoca la sesión en base de datos y caché, destruye la sesión HTTP y borra las cookies `auth.refresh` y `auth.session`. Nota: cambia estado con GET (pendiente migrar a POST).',
+    deprecated: false,
+  })
+  @ApiEnvelopeResponse({ description: 'Sesión cerrada.', message: 'Logout exitoso' })
   async logout(@Session() session: HttpSession, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const requestId = getRequestId(req);
     const sessionId = session.id;

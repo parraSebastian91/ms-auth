@@ -32,22 +32,24 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
       `[PASSWORD_RESET_REQUEST] INIT requestId=${requestId} email=${command.correo}`,
     );
     const contacto = await this.contactoRepository.findByCorreo(command.correo);
+    const genericResponse = {
+      message: 'Si el correo existe, recibirás un enlace de restablecimiento',
+    };
 
     if (!contacto) {
       // Por seguridad, no revelar si el email existe o no
       this.logger.warn(
         `[PASSWORD_RESET_REQUEST] NON_EXISTENT_EMAIL requestId=${requestId} email=${command.correo}`,
       );
-      return {
-        message: 'Si el correo existe, recibirás un enlace de restablecimiento',
-      };
+      return genericResponse;
     }
 
     if (!contacto.usuario.activo) {
+      // Misma respuesta que para un correo inexistente: no revelar el estado de la cuenta.
       this.logger.warn(
         `[PASSWORD_RESET_REQUEST] INACTIVE_USER requestId=${requestId} email=${command.correo}`,
       );
-      throw new BadRequestException('Usuario inactivo');
+      return genericResponse;
     }
 
     // Eliminar tokens anteriores del usuario
@@ -80,9 +82,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
       `[PASSWORD_RESET_REQUEST] TOKEN_CREATED requestId=${requestId} email=${command.correo} tokenUuid=${tokenUuid} expiresAt=${expiresAt.toISOString()}`,
     );
 
-    return {
-      message: 'Si el correo existe, recibirás un enlace de restablecimiento',
-    };
+    return genericResponse;
   }
 
   async ExecuteValidateResetToken(

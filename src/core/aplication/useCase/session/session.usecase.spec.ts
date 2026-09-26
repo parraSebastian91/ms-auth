@@ -1,6 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { makeConfig, makeFakeCache, makeRefreshSession, SECRETS } from 'src/test-support/fixtures';
+import { AuthAplicationService } from '../../service/auth.service';
 import { SessionUseCase } from './session.usecase';
 
 const access = new JwtService({ secret: SECRETS.access });
@@ -15,14 +16,14 @@ function setup(opts: { session?: any; usuario?: any } = {}) {
   const cache = makeFakeCache();
   const usuarioRepo: any = { getUsuarioById: jest.fn().mockResolvedValue(opts.usuario ?? null) };
   const refreshRepo: any = { findById: jest.fn().mockResolvedValue(opts.session === undefined ? makeRefreshSession() : opts.session) };
-  const authService: any = {
-    verifyTokenSecret: jest.fn().mockReturnValue(true),
-    rotateSession: jest.fn(async (p: any) => ({
-      plainToken: 'sid-1.new-uuid.newsecret',
-      session: { userId: p.userId, userUuid: p.userUuid, sessionUuid: 'new-uuid', sessionId: p.sessionId, deviceType: p.typeDevice },
-    })),
-    revokeUserSessions: jest.fn().mockResolvedValue(1),
-  };
+  // Servicio real (así el TTL por rol es el de producción); solo se espían las operaciones con E/S.
+  const authService: any = new AuthAplicationService(cache as any, refreshRepo, access, makeConfig());
+  jest.spyOn(authService, 'verifyTokenSecret').mockReturnValue(true);
+  jest.spyOn(authService, 'rotateSession').mockImplementation(async (p: any) => ({
+    plainToken: 'sid-1.new-uuid.newsecret',
+    session: { userId: p.userId, userUuid: p.userUuid, sessionUuid: 'new-uuid', sessionId: p.sessionId, deviceType: p.typeDevice },
+  }));
+  jest.spyOn(authService, 'revokeUserSessions').mockResolvedValue(1);
   const uc = new SessionUseCase(usuarioRepo, refreshRepo, authService, access, cache as any, makeConfig());
   return { uc, cache, usuarioRepo, refreshRepo, authService };
 }
@@ -149,9 +150,11 @@ describe('SessionUseCase', () => {
       };
       it('usuario común: TTL normal (5 min)', async () => { expect(await ttl({})).toBe(300); });
       it('rol ADMIN: TTL de administrador (30 min)', async () => { expect(await ttl({ roles: ['ADMIN'] })).toBe(1800); });
-      it('DOCUMENTA (posible bug): SUPER_ADMIN como rol NO recibe TTL de admin; la condición busca "SUPER_ADMIN" en permisos', async () => {
-        expect(await ttl({ roles: ['SUPER_ADMIN'] })).toBe(300);
-        expect(await ttl({ roles: ['CLIENTE_CEDENTE'], permissions: ['SUPER_ADMIN'] })).toBe(1800);
+      it('rol SUPER_ADMIN: también TTL de administrador (misma regla que el login)', async () => {
+        expect(await ttl({ roles: ['SUPER_ADMIN'] })).toBe(1800);
+      });
+      it('un permiso llamado SUPER_ADMIN NO da TTL de administrador: solo cuentan los roles', async () => {
+        expect(await ttl({ roles: ['CLIENTE_CEDENTE'], permissions: ['SUPER_ADMIN'] })).toBe(300);
       });
     });
   });

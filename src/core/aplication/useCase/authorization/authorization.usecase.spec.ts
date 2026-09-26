@@ -2,7 +2,6 @@ import * as bcrypt from 'bcrypt';
 import { EmailNotVerifiedError } from 'src/core/domain/errors/EmailNotVerified.error';
 import { InvalidcodeToken } from 'src/core/domain/errors/InvalidCodeToken.error';
 import { LoginError } from 'src/core/domain/errors/LoginError.error';
-import { UserNotFoundError } from 'src/core/domain/errors/UserNotFound.error';
 import { JwtService } from '@nestjs/jwt';
 import { makeConfig, makeFakeCache, makeUsuario, PKCE, SECRETS } from 'src/test-support/fixtures';
 import { AuthAplicationService } from '../../service/auth.service';
@@ -31,8 +30,10 @@ describe('AuthorizationUseCase', () => {
   beforeAll(async () => { hash = await bcrypt.hash(PASSWORD, 4); });
 
   describe('ExecuteAuthorize', () => {
-    it('lanza UserNotFoundError si el usuario no existe', async () => {
-      await expect(setup(null).uc.ExecuteAuthorize(authorizeCmd())).rejects.toBeInstanceOf(UserNotFoundError);
+    it('un usuario inexistente da LoginError (credenciales inválidas) y NO emite código', async () => {
+      const { uc, cache } = setup(null);
+      await expect(uc.ExecuteAuthorize(authorizeCmd())).rejects.toBeInstanceOf(LoginError);
+      expect(cache.setAuthCode).not.toHaveBeenCalled();
     });
 
     it('lanza LoginError con contraseña incorrecta y NO emite código', async () => {
@@ -41,10 +42,20 @@ describe('AuthorizationUseCase', () => {
       expect(cache.setAuthCode).not.toHaveBeenCalled();
     });
 
-    it('DOCUMENTA (enumeración de usuarios): usuario inexistente y contraseña errónea dan errores distintos', async () => {
+    it('anti-enumeración: usuario inexistente y contraseña errónea dan el MISMO error y mensaje', async () => {
       const missing = await setup(null).uc.ExecuteAuthorize(authorizeCmd()).catch(e => e);
       const wrong = await setup(makeUsuario({ password: hash })).uc.ExecuteAuthorize(authorizeCmd({ password: 'x' })).catch(e => e);
-      expect(missing.constructor).not.toBe(wrong.constructor);
+      expect(missing).toBeInstanceOf(LoginError);
+      expect(wrong).toBeInstanceOf(LoginError);
+      expect(missing.message).toBe(wrong.message);
+    });
+
+    it('anti-enumeración por tiempo: con usuario inexistente igual se ejecuta bcrypt (no responde al instante)', async () => {
+      const { uc } = setup(null);
+      const t0 = process.hrtime.bigint();
+      await uc.ExecuteAuthorize(authorizeCmd()).catch(() => undefined);
+      const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+      expect(ms).toBeGreaterThan(10); // bcrypt de coste 10 tarda decenas de ms; sin comparación sería < 1 ms
     });
 
     it('lanza EmailNotVerifiedError con el correo del contacto si el email no está verificado', async () => {

@@ -1,5 +1,12 @@
 # ms-identity — Referencia Técnica de Endpoints para Agente IA
 
+> **Contrato máquina-legible:** `BACKEND/ms-identity/openapi.json` (OpenAPI 3, generado desde los
+> controladores; regenerar con `npm run openapi`). En ejecución: `/docs` (UI) y `/docs-json`, fuera de
+> producción. Este documento es la guía narrativa (flujos y reglas); ante una discrepancia manda el
+> OpenAPI. Cambios de seguridad 2026-09-26: `authorize` responde **401** con el mismo mensaje si el
+> usuario no existe o la contraseña es incorrecta; `password-reset/request` responde siempre el mensaje
+> genérico.
+
 > Servicio: `ms-identity` | Puerto: `3000` (configurable vía `PORT`)
 > Última actualización: 2026-06-03
 

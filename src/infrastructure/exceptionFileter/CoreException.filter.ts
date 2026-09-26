@@ -83,7 +83,7 @@ export class CoreExceptionFilter implements ExceptionFilter {
         }
         else if (exception instanceof LoginError) {
             Logger.warn(`Login Error: ${exception.message}`, exception.stack);
-            status = HttpStatus.BAD_REQUEST;
+            status = HttpStatus.UNAUTHORIZED;
             message = exception.message;
         }
         else if (exception instanceof HttpException) {

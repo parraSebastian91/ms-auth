@@ -109,6 +109,15 @@ describe('AuthAplicationService', () => {
     });
   });
 
+  describe('accessTokenExpiresIn', () => {
+    it.each([
+      [['ADMIN'], '30m'], [['SUPER_ADMIN'], '30m'], [['CLIENTE_CEDENTE', 'ADMIN'], '30m'],
+      [['CLIENTE_CEDENTE'], '5m'], [[], '5m'], [undefined as any, '5m'],
+    ])('roles %p → %s', (roles, expected) => {
+      expect(setup().svc.accessTokenExpiresIn(roles)).toBe(expected);
+    });
+  });
+
   describe('revokeUserSessions', () => {
     it('devuelve 0 si no hay access token en caché', async () => {
       const { svc, refreshRepo } = setup();

@@ -22,8 +22,6 @@ export class SessionUseCase implements ISessionUseCase {
   private readonly logger = new Logger(SessionUseCase.name);
   private readonly accessSecret: string;
   private readonly refreshSecret: string;
-  private readonly accessExpiresIn: string;
-  private readonly adminExpiresIn: string;
   private readonly refreshExpiresIn: string;
 
   constructor(
@@ -36,8 +34,6 @@ export class SessionUseCase implements ISessionUseCase {
   ) {
     this.accessSecret = this.configService.get<string>('jwtConfig.access_secret');
     this.refreshSecret = this.configService.get<string>('jwtConfig.refresh_secret');
-    this.accessExpiresIn = this.configService.get<string>('jwtConfig.access_expires_in');
-    this.adminExpiresIn = this.configService.get<string>('jwtConfig.admin_expires_in');
     this.refreshExpiresIn = this.configService.get<string>('jwtConfig.refresh_expires_in');
   }
 
@@ -240,11 +236,7 @@ export class SessionUseCase implements ISessionUseCase {
       typeDevice: sessionHandler.session.deviceType,
     };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn:
-        payload.permissions.includes('SUPER_ADMIN') ||
-        payload.roles.includes('ADMIN')
-          ? this.adminExpiresIn
-          : this.accessExpiresIn,
+      expiresIn: this.authService.accessTokenExpiresIn(payload.roles),
       secret: this.accessSecret,
     } as JwtSignOptions);
     t = lap('jwt.sign(accessToken)', t);

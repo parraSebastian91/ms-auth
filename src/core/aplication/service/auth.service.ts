@@ -50,6 +50,12 @@ export class AuthAplicationService {
 
 
 
+    /** TTL del access token: los roles ADMIN y SUPER_ADMIN usan el TTL de administrador. */
+    accessTokenExpiresIn(roles: string[]): string {
+        const isAdmin = (roles ?? []).some(r => r === 'SUPER_ADMIN' || r === 'ADMIN');
+        return isAdmin ? this.adminExpiresIn : this.accessExpiresIn;
+    }
+
     /** validar que el usuario no tenga mas de 1 session por dispositivo y validar en cache antes que en db */
     public async createRefreshSession(
         sessionActive: AuthCodeStored,
@@ -79,8 +85,7 @@ export class AuthAplicationService {
             permissions: sessionActive.permisos,
             typeDevice: sessionActive.typeDevice
         }
-        const expireToken = (sessionActive.rol.includes('SUPER_ADMIN') || sessionActive.rol.includes('ADMIN')) ?
-            this.adminExpiresIn : this.accessExpiresIn;
+        const expireToken = this.accessTokenExpiresIn(sessionActive.rol);
         const accessToken = this.jwtService.sign(
             payload,
             { expiresIn: expireToken, secret: this.accessSecret } as JwtSignOptions);

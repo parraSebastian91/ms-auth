@@ -1,27 +1,34 @@
 import { Body, Controller, Get, HttpCode, Inject, Logger, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiCreatedResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiErrorResponse } from '../openapi/api-envelope';
 import { Request, Response } from 'express';
 import { Public } from '../decorators/public.decorator';
 import { IRegistroUseCase } from 'src/core/domain/puertos/inbound/IRegistro.usecase.interface';
 import { FormRegisterDto } from '../model/dto/formRegister.dto';
 import { IsNotEmpty, IsString, Length, IsEmail } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import { Counter } from 'prom-client';
 
 class VerificarEmailDto {
+    @ApiProperty({ example: 'ana@correo.cl' })
     @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
     @IsNotEmpty()
     email: string;
 
+    @ApiProperty({ minLength: 6, maxLength: 6, example: '123456' })
     @IsString() @Length(6, 6, { message: 'El código debe tener exactamente 6 dígitos' })
     otp: string;
 }
 
 class ResendOtpDto {
+    @ApiProperty({ example: 'ana@correo.cl' })
     @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
     @IsNotEmpty()
     email: string;
 }
 
+@ApiTags('Registro')
 @Controller("registro")
 @Public()
 export class RegistroController {
@@ -32,6 +39,10 @@ export class RegistroController {
     ) { }
 
     @Get("check/:field")
+    @ApiOperation({ summary: 'Comprueba si un campo (p. ej. username o correo) está disponible' })
+    @ApiParam({ name: 'field', example: 'username' })
+    @ApiQuery({ name: 'value', description: 'Valor a comprobar.' })
+    @ApiOkResponse({ description: 'Disponibilidad del valor.', schema: { type: 'object', properties: { available: { type: 'boolean' }, message: { type: 'string', nullable: true } } } })
     async getRegistro(
         @Param("field") field: string,
         @Query("value") value: string,
@@ -47,6 +58,9 @@ export class RegistroController {
     }
 
     @Post()
+    @ApiOperation({ summary: 'Registra un usuario; envía un código OTP al correo para verificarlo' })
+    @ApiCreatedResponse({ description: 'Registro creado.', schema: { type: 'object', properties: { message: { type: 'string' }, email: { type: 'string' } } } })
+    @ApiErrorResponse(400, 'Datos inválidos o usuario/correo ya registrado.')
     async createRegistro(
         @Body() body: FormRegisterDto,
         @Req() req: Request,
@@ -54,7 +68,8 @@ export class RegistroController {
     ) {
         const startedAt = Date.now();
         const correlationId = req["correlationId"];
-        this.logger.debug(`[START] createRegistro - CorrelationID: ${correlationId}, Body: ${JSON.stringify(body)}`);
+        // No registrar el cuerpo: incluye la contraseña en claro.
+        this.logger.debug(`[START] createRegistro - CorrelationID: ${correlationId}, Email: ${body.email}`);
         const result = await this.registroUseCase.executeCreateRegistro(FormRegisterDto.toDomain(body));
         if (!result.success) {
             this.logger.warn(`[FAIL] createRegistro - CorrelationID: ${correlationId}, Message: ${result.message ?? 'Error al crear el registro'}`);
@@ -68,6 +83,9 @@ export class RegistroController {
 
     @Post("verificar-email")
     @HttpCode(200)
+    @ApiOperation({ summary: 'Verifica el correo con el código OTP de 6 dígitos' })
+    @ApiOkResponse({ description: 'Correo verificado; ya se puede iniciar sesión.' })
+    @ApiErrorResponse(400, 'Código inválido o vencido.')
     async verificarEmail(
         @Body() body: VerificarEmailDto,
         @Req() req: Request,
@@ -82,6 +100,8 @@ export class RegistroController {
 
     @Post("resend-otp")
     @HttpCode(200)
+    @ApiOperation({ summary: 'Reenvía el código OTP (respuesta genérica: no revela si el correo existe)' })
+    @ApiOkResponse({ description: 'Solicitud aceptada.' })
     async resendOtp(
         @Body() body: ResendOtpDto,
         @Req() req: Request,

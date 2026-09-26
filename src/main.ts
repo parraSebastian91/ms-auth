@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from './infrastructure/http/pipes/validation.pipe';
+import { setupSwagger } from './infrastructure/http/openapi/build-openapi-document';
 
 import * as session from 'express-session';
 import { createClient } from 'redis';
@@ -84,6 +85,12 @@ async function bootstrap() {
   //   console.log('IP remota:', req.ip);
   //   next();
   // });
+
+  // Documentación OpenAPI: activa fuera de producción, o con SWAGGER_ENABLED=true.
+  // UI en /docs y JSON en /docs-json (acceder directo al servicio, no por el prefijo /api/auth del gateway).
+  if (!isProd || process.env.SWAGGER_ENABLED === 'true') {
+    setupSwagger(app, process.env.npm_package_version);
+  }
 
   const port = Number.parseInt(process.env.PORT ?? '', 10) || 3000;
   await app.listen(port, '0.0.0.0').then(() => {

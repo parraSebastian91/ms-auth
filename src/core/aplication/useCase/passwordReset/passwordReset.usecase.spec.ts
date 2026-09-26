@@ -35,9 +35,11 @@ describe('PasswordResetUseCase', () => {
       expect(resetRepo.createResetToken).not.toHaveBeenCalled();
     });
 
-    it('DOCUMENTA (filtración): un usuario inactivo recibe error distinto al genérico, lo que revela que el correo existe', async () => {
-      const { uc } = setup({ contacto: { usuario: { id: 7, activo: false } } });
-      await expect(uc.ExecuteRequestReset(cmd)).rejects.toBeInstanceOf(BadRequestException);
+    it('un usuario inactivo recibe el mismo mensaje genérico y no se crea token (no revela el estado de la cuenta)', async () => {
+      const { uc, resetRepo } = setup({ contacto: { usuario: { id: 7, activo: false } } });
+      await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
+      expect(resetRepo.createResetToken).not.toHaveBeenCalled();
+      expect(resetRepo.deleteUserTokens).not.toHaveBeenCalled();
     });
 
     it('con un usuario activo borra tokens previos y guarda uno nuevo hasheado que expira en ~1 hora', async () => {
@@ -53,10 +55,12 @@ describe('PasswordResetUseCase', () => {
       expect(expiresAt.getTime() - before).toBeLessThanOrEqual(61 * 60_000);
     });
 
-    it('la misma respuesta para correo existente e inexistente (anti-enumeración por cuerpo)', async () => {
+    it('la misma respuesta para correo inexistente, inactivo y activo (anti-enumeración por cuerpo)', async () => {
       const a = await setup().uc.ExecuteRequestReset(cmd);
       const b = await setup({ contacto: { usuario: { id: 7, activo: true } } }).uc.ExecuteRequestReset(cmd);
+      const c = await setup({ contacto: { usuario: { id: 7, activo: false } } }).uc.ExecuteRequestReset(cmd);
       expect(a).toEqual(b);
+      expect(a).toEqual(c);
     });
   });
 
