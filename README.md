@@ -7,6 +7,17 @@
 
 ---
 
+## Pruebas
+
+`npm test` corre toda la suite (sin dependencias externas). El rate limit tiene además pruebas contra un Redis real,
+que se omiten si no hay `TEST_REDIS_URL`:
+
+```bash
+docker run -d --rm --name redis-test -p 6390:6379 redis:7-alpine
+TEST_REDIS_URL=redis://localhost:6390 npx jest rate-limit.redis
+docker rm -f redis-test
+```
+
 ## Documentación de la API
 
 - **UI Swagger**: `http://localhost:<PORT>/docs` y contrato JSON en `/docs-json` (solo fuera de producción;

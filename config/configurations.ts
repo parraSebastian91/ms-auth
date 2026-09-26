@@ -22,6 +22,7 @@ export default () => ({
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
     ttl: parseInt(process.env.REDIS_TTL, 10) * 1000 || 3600 * 1000, // 1 hora por defecto
     password: process.env.REDIS_PASS,
+    db: parseInt(process.env.REDIS_DB ?? '0', 10) || 0,
   },
   vault: {
     addr: process.env.VAULT_ADDR,

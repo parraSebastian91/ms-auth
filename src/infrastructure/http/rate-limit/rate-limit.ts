@@ -1,4 +1,6 @@
-import { ThrottlerModuleOptions } from '@nestjs/throttler';
+import { createHash } from 'crypto';
+import { ExecutionContext } from '@nestjs/common';
+import { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler';
 
 const MINUTE = 60_000;
 export const minutes = (n: number) => n * MINUTE;
@@ -23,12 +25,25 @@ export function accountTracker(req: Record<string, any>): string {
 const disabled = () => process.env.RATE_LIMIT_ENABLED === 'false';
 
 /**
- * Limitadores globales, deliberadamente holgados: son la red de seguridad. Las rutas sensibles fijan
- * límites propios con @Throttle usando RATE_LIMITS. Almacenamiento en memoria (por instancia): con
- * varias réplicas el límite efectivo es N veces mayor hasta usar un almacenamiento compartido (Redis).
+ * Clave de contador: prefijo del servicio + hash de ruta, limitador y rastreador. El hash evita que
+ * correos y usernames (datos personales) queden como claves legibles en Redis.
  */
-export function createThrottlerOptions(): ThrottlerModuleOptions {
+export function rateLimitKey(context: ExecutionContext, tracker: string, throttlerName: string): string {
+  const hash = createHash('sha256')
+    .update(`${context.getClass().name}-${context.getHandler().name}-${throttlerName}-${tracker}`)
+    .digest('hex');
+  return `ms-identity:ratelimit:${hash}`;
+}
+
+/**
+ * Limitadores globales, deliberadamente holgados: son la red de seguridad. Las rutas sensibles fijan
+ * límites propios con @Throttle usando RATE_LIMITS. `storage` decide dónde viven los contadores: Redis
+ * (compartido entre réplicas) en el servicio; sin `storage`, memoria de la instancia (pruebas).
+ */
+export function createThrottlerOptions(storage?: ThrottlerStorage): ThrottlerModuleOptions {
   return {
+    storage,
+    generateKey: rateLimitKey,
     throttlers: [
       { name: 'ip', ttl: minutes(1), limit: 120, getTracker: req => `ip:${clientIp(req)}`, skipIf: disabled },
       { name: 'account', ttl: minutes(15), limit: 1000, getTracker: accountTracker, skipIf: disabled },

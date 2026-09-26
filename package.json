@@ -25,6 +25,7 @@
     "docker:publish": "docker push sebaondocker/seis-identity-service:latest"
   },
   "dependencies": {
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^10.0.0",
