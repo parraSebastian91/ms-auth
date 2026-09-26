@@ -3,9 +3,10 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { IPasswordResetUseCase } from 'src/core/domain/puertos/inbound/IPasswordResetUseCase.interface';
 import { IContactoRepository } from 'src/core/domain/puertos/outbound/iContactoRepository.interface';
+import { IEmailService } from 'src/core/domain/puertos/outbound/IEmailService.interface';
 import { IPasswordResetRepository } from 'src/core/domain/puertos/outbound/IPasswordResetRepository.interface';
-import { IRefreshSessionRepository } from 'src/core/domain/puertos/outbound/iRefreshSessionRepository.interface';
 import { IUsuarioRepository } from './../../../domain/puertos/outbound/iUsuarioRepository.interface';
+import { AuthAplicationService } from './../../service/auth.service';
 import {
   RequestPasswordResetCommand,
   ResetPasswordCommand,
@@ -21,7 +22,9 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     private usuarioRepository: IUsuarioRepository,
     private contactoRepository: IContactoRepository,
     private passwordResetRepo: IPasswordResetRepository,
-    private refreshSessionRepo: IRefreshSessionRepository,
+    private authService: AuthAplicationService,
+    private emailService: IEmailService,
+    private options: { frontendUrl: string },
   ) {}
 
   async ExecuteRequestReset(
@@ -73,10 +76,17 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     );
 
     // Construir URL de restablecimiento
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8000'}/pages/restablecer-password?token=${token}&uuid=${tokenUuid}`;
+    const resetUrl = `${this.options.frontendUrl}/pages/restablecer-password?token=${token}&uuid=${tokenUuid}`;
 
-    // TODO: Enviar email con el enlace
-    // await this.emailService.sendPasswordResetEmail(email, resetUrl, contacto.usuario.username);
+    // El envío es "mejor esfuerzo": si falla NO se cambia la respuesta (un error revelaría que el correo
+    // existe). El adaptador concreto (SMTP, SES, ...) se conecta por el puerto IEmailService.
+    try {
+      await this.emailService.sendPasswordResetLink(command.correo, resetUrl, contacto.nombres ?? contacto.usuario.userName);
+    } catch (error: any) {
+      this.logger.error(
+        `[PASSWORD_RESET_REQUEST] EMAIL_SEND_FAILED requestId=${requestId} tokenUuid=${tokenUuid}: ${error?.message ?? error}`,
+      );
+    }
 
     this.logger.log(
       `[PASSWORD_RESET_REQUEST] TOKEN_CREATED requestId=${requestId} email=${command.correo} tokenUuid=${tokenUuid} expiresAt=${expiresAt.toISOString()}`,
@@ -173,13 +183,16 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     // Marcar token como usado
     await this.passwordResetRepo.markTokenAsUsed(resetToken.id);
 
-    // TODO: Enviar email de confirmación
-    // await this.emailService.sendPasswordChangedConfirmation(resetToken.email);
+    // Cerrar TODAS las sesiones: refresh tokens en BD y access tokens en caché, para que una cuenta
+    // comprometida no siga entrando con un JWT ya emitido hasta que expire.
+    await this.authService.revokeAllUserSessions(resetToken.userId);
 
-    // Invalidar todas las sesiones del usuario (opcional pero recomendado)
-    await this.refreshSessionRepo.revokeAllUserSessions(
-      usuario.id.getValue().toString(),
-    );
+    // Aviso al usuario (mejor esfuerzo): la contraseña ya cambió, un fallo de correo no debe deshacerlo.
+    try {
+      await this.emailService.sendPasswordChangedNotice(resetToken.email, usuario.userName);
+    } catch (error: any) {
+      this.logger.error(`[RESET_PASSWORD] NOTICE_SEND_FAILED requestId=${requestId}: ${error?.message ?? error}`);
+    }
     this.logger.log(
       `[RESET_PASSWORD] SUCCESS requestId=${requestId} userUuid=${usuario.uuid}`,
     );

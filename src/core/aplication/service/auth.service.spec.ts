@@ -10,6 +10,8 @@ function setup() {
     rotate: jest.fn(async (_old: any, n: any) => ({ ...n, sessionUuid: 'rotated-uuid' })),
     revokeById: jest.fn(async () => undefined),
     revokeUserSessions: jest.fn(async () => 2),
+    getSessionsByUserId: jest.fn(async (): Promise<any[]> => []),
+    revokeAllUserSessions: jest.fn(async () => 0),
   };
   const jwt = new JwtService({ secret: SECRETS.access });
   const svc = new AuthAplicationService(cache as any, refreshRepo as any, jwt, makeConfig());
@@ -115,6 +117,58 @@ describe('AuthAplicationService', () => {
       [['CLIENTE_CEDENTE'], '5m'], [[], '5m'], [undefined as any, '5m'],
     ])('roles %p → %s', (roles, expected) => {
       expect(setup().svc.accessTokenExpiresIn(roles)).toBe(expected);
+    });
+  });
+
+  describe('revokeAllUserSessions', () => {
+    const sess = (sessionId: string) => ({ sessionId });
+
+    it('revoca en BD y borra de la caché los access tokens de cada sesión activa (sin repetir sessionId)', async () => {
+      const { svc, cache, refreshRepo } = setup();
+      refreshRepo.getSessionsByUserId.mockResolvedValue([sess('sid-1'), sess('sid-2'), sess('sid-1')]);
+      refreshRepo.revokeAllUserSessions.mockResolvedValue(3);
+      cache.tokens.set('sid-1', 'a'); cache.tokens.set('sid-2', 'b'); cache.tokens.set('sid-otro-usuario', 'c');
+
+      const out = await svc.revokeAllUserSessions(7);
+
+      expect(out).toEqual({ revoked: 3, cacheCleared: 2, cacheFailed: 0 });
+      expect(refreshRepo.getSessionsByUserId).toHaveBeenCalledWith('7');
+      expect(refreshRepo.revokeAllUserSessions).toHaveBeenCalledWith('7');
+      expect(cache.tokens.has('sid-1')).toBe(false);
+      expect(cache.tokens.has('sid-2')).toBe(false);
+      expect(cache.tokens.has('sid-otro-usuario')).toBe(true);
+      expect(cache.deleteAccessToken).toHaveBeenCalledTimes(2);
+    });
+
+    it('lista las sesiones ANTES de revocar (la consulta solo devuelve las no revocadas)', async () => {
+      const { svc, refreshRepo } = setup();
+      await svc.revokeAllUserSessions('7');
+      expect(refreshRepo.getSessionsByUserId.mock.invocationCallOrder[0]).toBeLessThan(refreshRepo.revokeAllUserSessions.mock.invocationCallOrder[0]);
+    });
+
+    it('sin sesiones activas no toca la caché', async () => {
+      const { svc, cache } = setup();
+      expect(await svc.revokeAllUserSessions(7)).toEqual({ revoked: 0, cacheCleared: 0, cacheFailed: 0 });
+      expect(cache.deleteAccessToken).not.toHaveBeenCalled();
+    });
+
+    it('si Redis falla en algún token no lanza: lo cuenta y sigue con los demás', async () => {
+      const { svc, cache, refreshRepo } = setup();
+      refreshRepo.getSessionsByUserId.mockResolvedValue([sess('sid-1'), sess('sid-2')]);
+      refreshRepo.revokeAllUserSessions.mockResolvedValue(2);
+      cache.deleteAccessToken.mockImplementation(async (id: string) => { if (id === 'sid-1') throw new Error('redis caído'); cache.tokens.delete(id); });
+      cache.tokens.set('sid-2', 'b');
+
+      expect(await svc.revokeAllUserSessions(7)).toEqual({ revoked: 2, cacheCleared: 1, cacheFailed: 1 });
+      expect(cache.tokens.has('sid-2')).toBe(false);
+    });
+
+    it('si la BD falla el error se propaga y no se toca la caché', async () => {
+      const { svc, cache, refreshRepo } = setup();
+      refreshRepo.getSessionsByUserId.mockResolvedValue([sess('sid-1')]);
+      refreshRepo.revokeAllUserSessions.mockRejectedValue(new Error('bd caída'));
+      await expect(svc.revokeAllUserSessions(7)).rejects.toThrow('bd caída');
+      expect(cache.deleteAccessToken).not.toHaveBeenCalled();
     });
   });
 

@@ -3,11 +3,12 @@ import * as bcrypt from 'bcrypt';
 import { PasswordResetUseCase } from './passwordReset.usecase';
 
 const GENERIC = 'Si el correo existe, recibirás un enlace de restablecimiento';
+const activeContacto = { nombres: 'Ana', usuario: { id: 7, activo: true, userName: 'ana' } };
 const TOKEN = 'token-plano-de-prueba';
 
 function setup(o: { contacto?: any; resetToken?: any; usuario?: any } = {}) {
   const usuarioRepo: any = {
-    getUsuarioById: jest.fn().mockResolvedValue(o.usuario === undefined ? { id: { getValue: () => 7 }, uuid: 'u-1' } : o.usuario),
+    getUsuarioById: jest.fn().mockResolvedValue(o.usuario === undefined ? { id: { getValue: () => 7 }, uuid: 'u-1', userName: 'ana' } : o.usuario),
     updatePassword: jest.fn().mockResolvedValue(undefined),
   };
   const contactoRepo: any = { findByCorreo: jest.fn().mockResolvedValue(o.contacto ?? null) };
@@ -17,8 +18,13 @@ function setup(o: { contacto?: any; resetToken?: any; usuario?: any } = {}) {
     findValidToken: jest.fn().mockResolvedValue(o.resetToken ?? null),
     markTokenAsUsed: jest.fn().mockResolvedValue(undefined),
   };
-  const sessionsRepo: any = { revokeAllUserSessions: jest.fn().mockResolvedValue(3) };
-  return { uc: new PasswordResetUseCase(usuarioRepo, contactoRepo, resetRepo, sessionsRepo), usuarioRepo, contactoRepo, resetRepo, sessionsRepo };
+  const authService: any = { revokeAllUserSessions: jest.fn().mockResolvedValue({ revoked: 2, cacheCleared: 2, cacheFailed: 0 }) };
+  const emailService: any = {
+    sendPasswordResetLink: jest.fn().mockResolvedValue(undefined),
+    sendPasswordChangedNotice: jest.fn().mockResolvedValue(undefined),
+  };
+  const uc = new PasswordResetUseCase(usuarioRepo, contactoRepo, resetRepo, authService, emailService, { frontendUrl: 'https://app.test' });
+  return { uc, usuarioRepo, contactoRepo, resetRepo, authService, emailService };
 }
 
 describe('PasswordResetUseCase', () => {
@@ -43,7 +49,7 @@ describe('PasswordResetUseCase', () => {
     });
 
     it('con un usuario activo borra tokens previos y guarda uno nuevo hasheado que expira en ~1 hora', async () => {
-      const { uc, resetRepo } = setup({ contacto: { usuario: { id: 7, activo: true } } });
+      const { uc, resetRepo } = setup({ contacto: activeContacto });
       const before = Date.now();
       await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
 
@@ -55,9 +61,39 @@ describe('PasswordResetUseCase', () => {
       expect(expiresAt.getTime() - before).toBeLessThanOrEqual(61 * 60_000);
     });
 
+    it('envía por correo un enlace cuyo token corresponde al hash guardado', async () => {
+      const { uc, resetRepo, emailService } = setup({ contacto: activeContacto });
+      await uc.ExecuteRequestReset(cmd);
+
+      expect(emailService.sendPasswordResetLink).toHaveBeenCalledTimes(1);
+      const [to, url, nombre] = emailService.sendPasswordResetLink.mock.calls[0];
+      expect(to).toBe('ana@test.cl');
+      expect(nombre).toBe('Ana');
+      const link = new URL(url);
+      expect(link.origin + link.pathname).toBe('https://app.test/pages/restablecer-password');
+      expect(link.searchParams.get('uuid')).toBe('tok-uuid');
+      const storedHash = resetRepo.createResetToken.mock.calls[0][2];
+      expect(await bcrypt.compare(link.searchParams.get('token')!, storedHash)).toBe(true);
+    });
+
+    it('no envía correo si el correo no existe o la cuenta está inactiva', async () => {
+      const a = setup();
+      await a.uc.ExecuteRequestReset(cmd);
+      const b = setup({ contacto: { usuario: { id: 7, activo: false } } });
+      await b.uc.ExecuteRequestReset(cmd);
+      expect(a.emailService.sendPasswordResetLink).not.toHaveBeenCalled();
+      expect(b.emailService.sendPasswordResetLink).not.toHaveBeenCalled();
+    });
+
+    it('si el envío falla no cambia la respuesta (no revelar que el correo existe) ni lanza', async () => {
+      const { uc, emailService } = setup({ contacto: activeContacto });
+      emailService.sendPasswordResetLink.mockRejectedValue(new Error('SMTP caído'));
+      await expect(uc.ExecuteRequestReset(cmd)).resolves.toEqual({ message: GENERIC });
+    });
+
     it('la misma respuesta para correo inexistente, inactivo y activo (anti-enumeración por cuerpo)', async () => {
       const a = await setup().uc.ExecuteRequestReset(cmd);
-      const b = await setup({ contacto: { usuario: { id: 7, activo: true } } }).uc.ExecuteRequestReset(cmd);
+      const b = await setup({ contacto: activeContacto }).uc.ExecuteRequestReset(cmd);
       const c = await setup({ contacto: { usuario: { id: 7, activo: false } } }).uc.ExecuteRequestReset(cmd);
       expect(a).toEqual(b);
       expect(a).toEqual(c);
@@ -108,7 +144,7 @@ describe('PasswordResetUseCase', () => {
     });
 
     it('con token válido guarda el hash bcrypt de la nueva contraseña, marca el token usado y revoca las sesiones', async () => {
-      const { uc, usuarioRepo, resetRepo, sessionsRepo } = setup({ resetToken: validRecord() });
+      const { uc, usuarioRepo, resetRepo, authService } = setup({ resetToken: validRecord() });
       await expect(uc.ExecuteResetPassword(cmd())).resolves.toEqual({ message: 'Contraseña restablecida exitosamente' });
 
       const [userId, hash] = usuarioRepo.updatePassword.mock.calls[0];
@@ -116,7 +152,35 @@ describe('PasswordResetUseCase', () => {
       expect(hash).not.toBe('Nueva#1234');
       expect(await bcrypt.compare('Nueva#1234', hash)).toBe(true);
       expect(resetRepo.markTokenAsUsed).toHaveBeenCalledWith(5);
-      expect(sessionsRepo.revokeAllUserSessions).toHaveBeenCalledWith('7');
+      expect(authService.revokeAllUserSessions).toHaveBeenCalledWith(7);
+    });
+
+    it('cierra las sesiones DESPUÉS de cambiar la contraseña y marcar el token', async () => {
+      const { uc, usuarioRepo, resetRepo, authService } = setup({ resetToken: validRecord() });
+      await uc.ExecuteResetPassword(cmd());
+      const order = (m: jest.Mock) => m.mock.invocationCallOrder[0];
+      expect(order(usuarioRepo.updatePassword)).toBeLessThan(order(authService.revokeAllUserSessions));
+      expect(order(resetRepo.markTokenAsUsed)).toBeLessThan(order(authService.revokeAllUserSessions));
+    });
+
+    it('avisa al usuario del cambio, pero un fallo del correo no deshace el restablecimiento', async () => {
+      const { uc, emailService } = setup({ resetToken: validRecord() });
+      emailService.sendPasswordChangedNotice.mockRejectedValue(new Error('SMTP caído'));
+      await expect(uc.ExecuteResetPassword(cmd())).resolves.toEqual({ message: 'Contraseña restablecida exitosamente' });
+      expect(emailService.sendPasswordChangedNotice).toHaveBeenCalledWith('ana@test.cl', 'ana');
+    });
+
+    it('si no se pueden cerrar las sesiones en BD el error se propaga (no se da por bueno el reset)', async () => {
+      const { uc, authService } = setup({ resetToken: validRecord() });
+      authService.revokeAllUserSessions.mockRejectedValue(new Error('bd caída'));
+      await expect(uc.ExecuteResetPassword(cmd())).rejects.toThrow('bd caída');
+    });
+
+    it('con token inválido no cierra sesiones ni envía avisos', async () => {
+      const { uc, authService, emailService } = setup({ resetToken: validRecord() });
+      await uc.ExecuteResetPassword(cmd({ token: 'otro' })).catch(() => undefined);
+      expect(authService.revokeAllUserSessions).not.toHaveBeenCalled();
+      expect(emailService.sendPasswordChangedNotice).not.toHaveBeenCalled();
     });
   });
 });

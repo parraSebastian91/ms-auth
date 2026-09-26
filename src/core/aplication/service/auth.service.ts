@@ -205,6 +205,29 @@ export class AuthAplicationService {
         return revokedCount;
     }
 
+    /**
+     * Cierra TODAS las sesiones de un usuario: las revoca en BD (el refresh token deja de servir) y
+     * borra sus access tokens de la caché (deja de pasar el guard sin esperar a que el JWT expire).
+     * La BD es obligatoria y su error se propaga; la caché es "mejor esfuerzo": si falla se registra,
+     * y el access token cacheado sigue vivo como máximo hasta su expiración.
+     */
+    async revokeAllUserSessions(userId: number | string): Promise<{ revoked: number; cacheCleared: number; cacheFailed: number }> {
+        const id = String(userId);
+        // Listar ANTES de revocar: la consulta solo devuelve sesiones no revocadas.
+        const active = await this.refreshSessionRepo.getSessionsByUserId(id);
+        const sessionIds = [...new Set(active.map(s => s.sessionId).filter(Boolean))];
+
+        const revoked = await this.refreshSessionRepo.revokeAllUserSessions(id);
+
+        const results = await Promise.allSettled(sessionIds.map(sid => this.cacheRepository.deleteAccessToken(sid)));
+        const cacheFailed = results.filter(r => r.status === 'rejected').length;
+        if (cacheFailed > 0) {
+            this.logger.error(`No se pudo borrar ${cacheFailed} access token(s) de la caché del usuario ${id}; expirarán solos.`);
+        }
+        this.logger.log(`Sesiones cerradas para userId=${id}: bd=${revoked} cache=${sessionIds.length - cacheFailed}`);
+        return { revoked, cacheCleared: sessionIds.length - cacheFailed, cacheFailed };
+    }
+
     async createAuthorizationCode(usuario: UsuarioModel, codeChallenge: string, typeDevice: string, CorrelationId: string): Promise<string> {
         const code = randomBytes(32).toString('hex');
         await this.cacheRepository.setAuthCode(
