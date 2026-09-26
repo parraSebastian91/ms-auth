@@ -91,6 +91,16 @@ describe('Contrato OpenAPI de ms-identity', () => {
     await app.close();
   });
 
+  it('los endpoints con límite de intentos documentan la respuesta 429', () => {
+    const limitados = [
+      'POST /security/authorize', 'POST /security/token', 'POST /security/password-reset/request',
+      'GET /security/password-reset/validate', 'POST /security/password-reset/reset', 'POST /registro',
+      'GET /registro/check/{field}', 'POST /registro/verificar-email', 'POST /registro/resend-otp',
+    ];
+    const ops = Object.fromEntries(operations().map(o => [o.key, o.op]));
+    for (const k of limitados) expect(Object.keys(ops[k].responses)).toContain('429');
+  });
+
   it('coincide con el openapi.json versionado (regenerar con: npm run openapi)', () => {
     if (process.env.WRITE_OPENAPI) fs.writeFileSync(CONTRACT_FILE, JSON.stringify(doc, null, 2) + '\n');
     expect(fs.existsSync(CONTRACT_FILE)).toBe(true);

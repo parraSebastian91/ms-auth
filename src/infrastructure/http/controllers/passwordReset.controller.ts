@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Inject, Ip, Logger, Post, Query, Req, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Inject, Ip, Logger, Post, Query, Req, UseFilters, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { IPasswordResetUseCase, PASSWORD_RESET_USE_CASE } from 'src/core/domain/puertos/inbound/IPasswordResetUseCase.interface';
@@ -7,11 +8,14 @@ import { AuthMetricsService } from 'src/infrastructure/metrics/auth-metrics.serv
 import { Public } from '../decorators/public.decorator';
 import { RequestPasswordResetDto, ResetPasswordDto, ValidateResetTokenDto } from '../model/dto/forgot-password.dto';
 import { ApiErrorResponse } from '../openapi/api-envelope';
+import { RATE_LIMITS } from '../rate-limit/rate-limit';
 import { getRequestId } from '../support/request-id';
+import { AuthThrottlerGuard } from '../rate-limit/auth-throttler.guard';
 
 /** Recuperación de contraseña. Devuelve el resultado del caso de uso tal cual (contrato existente). */
 @ApiTags('Recuperación de contraseña')
 @Controller('security/password-reset')
+@UseGuards(AuthThrottlerGuard)
 @UseFilters(CoreExceptionFilter)
 @Public()
 export class PasswordResetController {
@@ -23,6 +27,8 @@ export class PasswordResetController {
   ) {}
 
   @Post('request')
+  @Throttle(RATE_LIMITS.resetRequest)
+  @ApiErrorResponse(429, 'Demasiadas solicitudes (por IP o por correo). Cabecera Retry-After.')
   @ApiOperation({
     summary: 'Solicita el enlace de restablecimiento',
     description: 'Responde siempre el mismo mensaje genérico (exista o no el correo, esté o no activa la cuenta). Estado actual: el envío del correo aún NO está implementado.',
@@ -41,6 +47,8 @@ export class PasswordResetController {
   }
 
   @Get('validate')
+  @Throttle(RATE_LIMITS.resetValidate)
+  @ApiErrorResponse(429, 'Demasiadas solicitudes desde la misma IP.')
   @ApiOperation({ summary: 'Comprueba si el token del enlace sigue siendo válido' })
   @ApiOkResponse({ description: 'Resultado de la validación.', schema: { type: 'object', properties: { valid: { type: 'boolean' }, email: { type: 'string', nullable: true } } } })
   async validate(@Query() dto: ValidateResetTokenDto, @Req() req: Request) {
@@ -48,6 +56,8 @@ export class PasswordResetController {
   }
 
   @Post('reset')
+  @Throttle(RATE_LIMITS.resetConfirm)
+  @ApiErrorResponse(429, 'Demasiadas solicitudes desde la misma IP.')
   @ApiOperation({ summary: 'Establece la nueva contraseña con el token del enlace', description: 'Marca el token como usado y revoca las sesiones del usuario en base de datos.' })
   @ApiOkResponse({ description: 'Contraseña restablecida.', schema: { type: 'object', properties: { message: { type: 'string', example: 'Contraseña restablecida exitosamente' } } } })
   @ApiErrorResponse(400, 'Contraseñas distintas, token inválido o expirado.')

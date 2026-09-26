@@ -13,6 +13,8 @@ import { rolEnum } from "src/core/domain/model/constantes.model";
 
 const BCRYPT_ROUNDS = 10;
 const VERIFICATION_CODE_TTL_MIN = 10;
+/** Intentos fallidos permitidos por código: con 6 dígitos, sin tope se adivina por fuerza bruta. */
+export const MAX_OTP_ATTEMPTS = 5;
 
 export class RegistroUseCaseImpl implements IRegistroUseCase {
     private readonly logger = new Logger(RegistroUseCaseImpl.name);
@@ -59,6 +61,7 @@ export class RegistroUseCaseImpl implements IRegistroUseCase {
             const code = this.generateVerificationCode();
             const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
             await this.cacheRepository.setEmailVerificationCode(usuarioUuid, codeHash);
+            await this.cacheRepository.clearEmailVerificationAttempts(usuarioUuid);
 
             // Enviar código (consola ahora, SMTP/SendGrid en producción)
             await this.emailService.sendVerificationCode(
@@ -100,11 +103,20 @@ export class RegistroUseCaseImpl implements IRegistroUseCase {
 
         const isValid = await bcrypt.compare(code, storedHash);
         if (!isValid) {
+            const attempts = await this.cacheRepository.incrementEmailVerificationAttempts(usuario.uuid);
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                // Invalidar el código: el atacante debe pedir uno nuevo (y eso también está limitado por petición).
+                await this.cacheRepository.deleteEmailVerificationCode(usuario.uuid);
+                await this.cacheRepository.clearEmailVerificationAttempts(usuario.uuid);
+                this.logger.warn(`[VERIFICACION_EMAIL] CODIGO_INVALIDADO_POR_INTENTOS userUuid=${usuario.uuid}`);
+                return { success: false, message: 'Demasiados intentos incorrectos. Solicita un código nuevo.' };
+            }
             return { success: false, message: 'Código incorrecto.' };
         }
 
         await this.usuarioRepository.marcarEmailVerificado(usuario.uuid);
         await this.cacheRepository.deleteEmailVerificationCode(usuario.uuid);
+        await this.cacheRepository.clearEmailVerificationAttempts(usuario.uuid);
         await this.rolRepository.setRolInicial(usuario.id, rolEnum.CEDENTE); // Asignar rol inicial (ajustar según tipo de usuario)
         this.logger.log(`[VERIFICACION_EMAIL] SUCCESS userUuid=${usuario.uuid}`);
         return { success: true };
@@ -127,6 +139,7 @@ export class RegistroUseCaseImpl implements IRegistroUseCase {
         const code = this.generateVerificationCode();
         const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
         await this.cacheRepository.setEmailVerificationCode(usuario.uuid, codeHash);
+        await this.cacheRepository.clearEmailVerificationAttempts(usuario.uuid);
         await this.emailService.sendVerificationCode(email, code, usuario.nombres);
 
         this.logger.log(`[RESEND_OTP] Código reenviado | userUuid=${usuario.uuid}`);

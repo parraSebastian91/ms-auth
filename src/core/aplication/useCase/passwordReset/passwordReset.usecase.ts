@@ -5,6 +5,7 @@ import { IPasswordResetUseCase } from 'src/core/domain/puertos/inbound/IPassword
 import { IContactoRepository } from 'src/core/domain/puertos/outbound/iContactoRepository.interface';
 import { IEmailService } from 'src/core/domain/puertos/outbound/IEmailService.interface';
 import { IPasswordResetRepository } from 'src/core/domain/puertos/outbound/IPasswordResetRepository.interface';
+import { maskEmail } from 'src/core/share/log-sanitizer';
 import { IUsuarioRepository } from './../../../domain/puertos/outbound/iUsuarioRepository.interface';
 import { AuthAplicationService } from './../../service/auth.service';
 import {
@@ -32,7 +33,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
   ): Promise<{ message: string }> {
     const requestId = command.requestId || 'N/A';
     this.logger.log(
-      `[PASSWORD_RESET_REQUEST] INIT requestId=${requestId} email=${command.correo}`,
+      `[PASSWORD_RESET_REQUEST] INIT requestId=${requestId} email=${maskEmail(command.correo)}`,
     );
     const contacto = await this.contactoRepository.findByCorreo(command.correo);
     const genericResponse = {
@@ -42,7 +43,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     if (!contacto) {
       // Por seguridad, no revelar si el email existe o no
       this.logger.warn(
-        `[PASSWORD_RESET_REQUEST] NON_EXISTENT_EMAIL requestId=${requestId} email=${command.correo}`,
+        `[PASSWORD_RESET_REQUEST] NON_EXISTENT_EMAIL requestId=${requestId} email=${maskEmail(command.correo)}`,
       );
       return genericResponse;
     }
@@ -50,7 +51,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     if (!contacto.usuario.activo) {
       // Misma respuesta que para un correo inexistente: no revelar el estado de la cuenta.
       this.logger.warn(
-        `[PASSWORD_RESET_REQUEST] INACTIVE_USER requestId=${requestId} email=${command.correo}`,
+        `[PASSWORD_RESET_REQUEST] INACTIVE_USER requestId=${requestId} email=${maskEmail(command.correo)}`,
       );
       return genericResponse;
     }
@@ -89,7 +90,7 @@ export class PasswordResetUseCase implements IPasswordResetUseCase {
     }
 
     this.logger.log(
-      `[PASSWORD_RESET_REQUEST] TOKEN_CREATED requestId=${requestId} email=${command.correo} tokenUuid=${tokenUuid} expiresAt=${expiresAt.toISOString()}`,
+      `[PASSWORD_RESET_REQUEST] TOKEN_CREATED requestId=${requestId} email=${maskEmail(command.correo)} tokenUuid=${tokenUuid} expiresAt=${expiresAt.toISOString()}`,
     );
 
     return genericResponse;

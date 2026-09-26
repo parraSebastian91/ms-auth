@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { DiskHealthIndicator, HealthCheckService, MemoryHealthIndicator, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { getToken } from '@willsoto/nestjs-prometheus';
 import { AUTHORIZATION_USE_CASE } from 'src/core/domain/puertos/inbound/IAuthorizationUseCase.interface';
@@ -13,12 +14,14 @@ import { RegistroController } from 'src/infrastructure/http/controllers/registro
 import { SessionController } from 'src/infrastructure/http/controllers/session.controller';
 import { UserProfileController } from 'src/infrastructure/http/controllers/userProfile.controller';
 import { buildOpenApiDocument } from 'src/infrastructure/http/openapi/build-openapi-document';
+import { createThrottlerOptions } from 'src/infrastructure/http/rate-limit/rate-limit';
 import { AuthMetricsService } from 'src/infrastructure/metrics/auth-metrics.service';
 
 /** App (SIN inicializar) con los controladores REALES y dependencias de mentira (sin BD, Redis ni Vault). */
 export async function createOpenApiApp() {
   const stub = { useValue: {} };
   const moduleRef = await Test.createTestingModule({
+    imports: [ThrottlerModule.forRoot(createThrottlerOptions())],
     controllers: [AuthorizationController, SessionController, PasswordResetController, RegistroController, UserProfileController, HealthController],
     providers: [
       { provide: AUTHORIZATION_USE_CASE, ...stub },

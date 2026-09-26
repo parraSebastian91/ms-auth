@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IEmailService } from '../../core/domain/puertos/outbound/IEmailService.interface';
+import { maskEmail } from '../../core/share/log-sanitizer';
 
 /**
  * ConsoleEmailAdapter — adaptador temporal sin servidor de correo.
@@ -22,7 +23,7 @@ export class ConsoleEmailAdapter implements IEmailService {
 
     async sendPasswordResetLink(email: string, resetUrl: string, nombre: string): Promise<void> {
         if (this.isProduction) {
-            this.logger.warn(`Correo de restablecimiento NO enviado a ${email}: no hay adaptador de correo real configurado.`);
+            this.logger.warn(`Correo de restablecimiento NO enviado a ${maskEmail(email)}: no hay adaptador de correo real configurado.`);
             return;
         }
         this.logger.log('═══════════════════════════════════════════════');
@@ -39,6 +40,10 @@ export class ConsoleEmailAdapter implements IEmailService {
     }
 
     async sendVerificationCode(email: string, code: string, nombre: string): Promise<void> {
+        if (this.isProduction) {
+            this.logger.warn(`Código de verificación NO enviado a ${maskEmail(email)}: no hay adaptador de correo real configurado.`);
+            return;
+        }
         this.logger.log('═══════════════════════════════════════════════');
         this.logger.log(`  VERIFICACIÓN DE CORREO (modo consola)`);
         this.logger.log(`  Para:    ${email}`);

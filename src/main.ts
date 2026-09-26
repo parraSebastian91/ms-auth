@@ -16,7 +16,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.use(cookieParser());
-  app.getHttpAdapter().getInstance().set('trust proxy', true);
+  // `trust proxy: true` confía en TODA la cadena X-Forwarded-For (el cliente puede falsear su IP y evadir el
+  // límite por IP). Con TRUST_PROXY_HOPS=<n> solo se confía en n proxies (p. ej. 1 si solo está el gateway).
+  const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '', 10);
+  app.getHttpAdapter().getInstance().set('trust proxy', Number.isNaN(trustProxyHops) ? true : trustProxyHops);
   // Deshabilitar CORS completamente
 
   const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:4200';

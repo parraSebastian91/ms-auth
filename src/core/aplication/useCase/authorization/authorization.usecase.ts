@@ -7,6 +7,7 @@ import { IAuthorizationUseCase } from 'src/core/domain/puertos/inbound/IAuthoriz
 import { ICacheRepository } from 'src/core/domain/puertos/outbound/CacheRepository.interface';
 import { IUsuarioRepository } from './../../../domain/puertos/outbound/iUsuarioRepository.interface';
 import { AuthAplicationService } from './../../service/auth.service';
+import { maskIdentifier } from 'src/core/share/log-sanitizer';
 import { AuthorizeCommand, TokenCommand } from './../auth/command/AuthCommand.interface';
 
 /**
@@ -32,7 +33,7 @@ export class AuthorizationUseCase implements IAuthorizationUseCase {
   ): Promise<{ code: string; url: string }[]> {
     const requestId = command.requestId || 'N/A';
     this.logger.log(
-      `[AUTHORIZE] INIT requestId=${requestId} username=${command.username} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`,
+      `[AUTHORIZE] INIT requestId=${requestId} username=${maskIdentifier(command.username)} device=${command.typeDevice} CorrelationId=${command.CorrelationId}`,
     );
     const usuario = await this.usuarioRepository.getUsuarioByUsername(
       command.username,
@@ -40,20 +41,20 @@ export class AuthorizationUseCase implements IAuthorizationUseCase {
     if (!usuario) {
       await bcrypt.compare(command.password, DUMMY_PASSWORD_HASH);
       this.logger.warn(
-        `[AUTHORIZE] USER_NOT_FOUND requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] USER_NOT_FOUND requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
       throw new LoginError(INVALID_CREDENTIALS);
     }
     if (!(await bcrypt.compare(command.password, usuario.password))) {
       this.logger.warn(
-        `[AUTHORIZE] INVALID_CREDENTIALS requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] INVALID_CREDENTIALS requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
       throw new LoginError(INVALID_CREDENTIALS);
     }
     if (!usuario.emailVerificado) {
       const email = usuario.contacto?.correo ?? command.username;
       this.logger.warn(
-        `[AUTHORIZE] EMAIL_NOT_VERIFIED requestId=${requestId} username=${command.username} CorrelationId=${command.CorrelationId}`,
+        `[AUTHORIZE] EMAIL_NOT_VERIFIED requestId=${requestId} username=${maskIdentifier(command.username)} CorrelationId=${command.CorrelationId}`,
       );
       throw new EmailNotVerifiedError(email);
     }
@@ -78,7 +79,7 @@ export class AuthorizationUseCase implements IAuthorizationUseCase {
       url: `/validate?code=${encodeURIComponent(code)}&cid=${encodeURIComponent(command.CorrelationId)}`,
     }));
     this.logger.log(
-      `[AUTHORIZE] SUCCESS requestId=${requestId} username=${command.username} systems=${uris.length}`,
+      `[AUTHORIZE] SUCCESS requestId=${requestId} username=${maskIdentifier(command.username)} systems=${uris.length}`,
     );
     return uris;
   }

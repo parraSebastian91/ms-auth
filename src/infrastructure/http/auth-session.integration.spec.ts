@@ -1,6 +1,7 @@
 import { Controller, Get, UnauthorizedException } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
 import * as request from 'supertest';
 import { AUTHORIZATION_USE_CASE } from 'src/core/domain/puertos/inbound/IAuthorizationUseCase.interface';
 import { SESSION_USE_CASE } from 'src/core/domain/puertos/inbound/ISessionUseCase.interface';
@@ -8,6 +9,7 @@ import { AuthMetricsService } from 'src/infrastructure/metrics/auth-metrics.serv
 import { makeMetricsMock } from 'src/test-support/http-app';
 import { AuthorizationController } from './controllers/authorization.controller';
 import { AuthGuard } from './guards/auth.guard';
+import { createThrottlerOptions } from './rate-limit/rate-limit';
 import { ValidationPipe } from './pipes/validation.pipe';
 
 const cookieParser = require('cookie-parser');
@@ -29,6 +31,7 @@ async function setup() {
   };
   let validId = '';
   const moduleRef = await Test.createTestingModule({
+    imports: [ThrottlerModule.forRoot(createThrottlerOptions())],
     controllers: [AuthorizationController, ProtectedController],
     providers: [
       { provide: AUTHORIZATION_USE_CASE, useValue: authorization },

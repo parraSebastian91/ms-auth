@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters, UseGuards } from '@nestjs/common';
+
 import { ApiCookieAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { refreshSessionCommand } from 'src/core/aplication/useCase/auth/command/AuthCommand.interface';
@@ -12,10 +13,12 @@ import { ApiEnvelopeResponse, ApiErrorResponse } from '../openapi/api-envelope';
 import { clearAuthCookies, setRefreshCookie } from '../support/auth-cookies';
 import { getRequestId } from '../support/request-id';
 import { destroySession, establishAuthenticatedSession, HttpSession } from '../support/session-store';
+import { AuthThrottlerGuard } from '../rate-limit/auth-throttler.guard';
 
 /** Ciclo de vida de la sesión: renovar (rotar el refresh token) y cerrar. */
 @ApiTags('Sesión')
 @Controller('security')
+@UseGuards(AuthThrottlerGuard)
 @UseFilters(CoreExceptionFilter)
 export class SessionController {
   private readonly logger = new Logger(SessionController.name);

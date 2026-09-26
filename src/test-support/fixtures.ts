@@ -61,6 +61,8 @@ export function makeRefreshSession(o: Partial<{
 export function makeFakeCache() {
   const codes = new Map<string, any>();
   const tokens = new Map<string, string>();
+  const emailCodes = new Map<string, string>();
+  const attempts = new Map<string, number>();
   return {
     codes, tokens,
     setAuthCode: jest.fn(async (c: string, v: any) => { codes.set(c, v); }),
@@ -69,7 +71,12 @@ export function makeFakeCache() {
     setAccessToken: jest.fn(async (id: string, t: string) => { tokens.set(id, t); }),
     getAccessToken: jest.fn(async (id: string) => tokens.get(id) ?? null),
     deleteAccessToken: jest.fn(async (id: string) => { tokens.delete(id); }),
-    setEmailVerificationCode: jest.fn(), getEmailVerificationCode: jest.fn(), deleteEmailVerificationCode: jest.fn(),
+    emailCodes, attempts,
+    setEmailVerificationCode: jest.fn(async (u: string, h: string) => { emailCodes.set(u, h); }),
+    getEmailVerificationCode: jest.fn(async (u: string) => emailCodes.get(u) ?? null),
+    deleteEmailVerificationCode: jest.fn(async (u: string) => { emailCodes.delete(u); }),
+    incrementEmailVerificationAttempts: jest.fn(async (u: string) => { const n = (attempts.get(u) ?? 0) + 1; attempts.set(u, n); return n; }),
+    clearEmailVerificationAttempts: jest.fn(async (u: string) => { attempts.delete(u); }),
   };
 }
 

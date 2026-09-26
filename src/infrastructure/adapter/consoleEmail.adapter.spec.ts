@@ -26,6 +26,24 @@ describe('ConsoleEmailAdapter (adaptador sin servidor de correo)', () => {
     await new ConsoleEmailAdapter().sendPasswordResetLink('ana@test.cl', URL_CON_TOKEN, 'Ana');
     const out = lines.join('\n');
     expect(out).not.toContain('SECRETO123');
+    expect(out).not.toContain('ana@test.cl');
+    expect(out).toMatch(/NO enviado/);
+  });
+
+  it('en desarrollo imprime el código de verificación (OTP) para poder registrarse sin correo', async () => {
+    process.env.NODE_ENV = 'development';
+    const lines = capture();
+    await new ConsoleEmailAdapter().sendVerificationCode('ana@test.cl', '123456', 'Ana');
+    expect(lines.join('\n')).toContain('123456');
+  });
+
+  it('en producción NO imprime el código OTP ni el correo completo', async () => {
+    process.env.NODE_ENV = 'production';
+    const lines = capture();
+    await new ConsoleEmailAdapter().sendVerificationCode('ana@test.cl', '123456', 'Ana');
+    const out = lines.join('\n');
+    expect(out).not.toContain('123456');
+    expect(out).not.toContain('ana@test.cl');
     expect(out).toMatch(/NO enviado/);
   });
 

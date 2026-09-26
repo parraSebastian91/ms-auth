@@ -11,4 +11,11 @@ export interface ICacheRepository {
     getEmailVerificationCode(userUuid: string): Promise<string | null>;
     /** Elimina el código tras verificarlo */
     deleteEmailVerificationCode(userUuid: string): Promise<void>;
+    /**
+     * Cuenta un intento FALLIDO de verificar el código y devuelve el total acumulado. El contador vive
+     * lo mismo que el código. No es atómico (get+set): el límite por petición de la capa HTTP lo complementa.
+     */
+    incrementEmailVerificationAttempts(userUuid: string): Promise<number>;
+    /** Reinicia el contador (al emitir un código nuevo o al verificar con éxito). */
+    clearEmailVerificationAttempts(userUuid: string): Promise<void>;
 }

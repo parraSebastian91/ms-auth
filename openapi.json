@@ -96,6 +96,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiados intentos (por IP o por usuario). Cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -159,6 +169,16 @@
           },
           "400": {
             "description": "Código inexistente/consumido, verifier PKCE inválido o dispositivo distinto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
             "content": {
               "application/json": {
                 "schema": {
@@ -329,6 +349,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes (por IP o por correo). Cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -379,6 +409,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -421,6 +461,16 @@
           },
           "400": {
             "description": "Contraseñas distintas, token inválido o expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma IP.",
             "content": {
               "application/json": {
                 "schema": {
@@ -478,6 +528,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiadas comprobaciones desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -528,6 +588,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiados registros desde la misma IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -563,6 +633,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Demasiados intentos (por IP o por correo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -588,6 +668,16 @@
         "responses": {
           "200": {
             "description": "Solicitud aceptada."
+          },
+          "429": {
+            "description": "Demasiados reenvíos (por IP o por correo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [

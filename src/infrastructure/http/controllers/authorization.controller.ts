@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Inject, Logger, Post, Req, Res, Session, UseFilters, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthorizeCommand, TokenCommand } from 'src/core/aplication/useCase/auth/command/AuthCommand.interface';
@@ -9,9 +10,11 @@ import { Public } from '../decorators/public.decorator';
 import { ApiResponse } from '../model/api-response.model';
 import { AuthorizeRequestDto, TokenRequestDto } from '../model/dto/auth.dto';
 import { ApiEnvelopeResponse, ApiErrorResponse } from '../openapi/api-envelope';
+import { RATE_LIMITS } from '../rate-limit/rate-limit';
 import { getRequestId } from '../support/request-id';
 import { setRefreshCookie } from '../support/auth-cookies';
 import { establishAuthenticatedSession, HttpSession } from '../support/session-store';
+import { AuthThrottlerGuard } from '../rate-limit/auth-throttler.guard';
 
 /**
  * Authorization Code + PKCE.
@@ -20,6 +23,7 @@ import { establishAuthenticatedSession, HttpSession } from '../support/session-s
  */
 @ApiTags('Autorización (Authorization Code + PKCE)')
 @Controller('security')
+@UseGuards(AuthThrottlerGuard)
 @UseFilters(CoreExceptionFilter)
 export class AuthorizationController {
   private readonly logger = new Logger(AuthorizationController.name);
@@ -32,6 +36,8 @@ export class AuthorizationController {
   @Post('authorize')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @Throttle(RATE_LIMITS.authorize)
+  @ApiErrorResponse(429, 'Demasiados intentos (por IP o por usuario). Cabecera Retry-After.')
   @ApiOperation({
     summary: 'Paso 1: valida credenciales y emite un código de autorización',
     description: 'El cliente genera un `code_verifier` aleatorio y envía su hash S256 como `code_challenge`. Devuelve una redirección por cada sistema al que el usuario tiene acceso; todas llevan el mismo código.',
@@ -70,6 +76,8 @@ export class AuthorizationController {
   @Post('token')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @Throttle(RATE_LIMITS.token)
+  @ApiErrorResponse(429, 'Demasiadas solicitudes desde la misma IP.')
   @ApiOperation({
     summary: 'Paso 2: canjea el código (+ code_verifier) por la sesión',
     description: 'Verifica PKCE y el tipo de dispositivo, consume el código (un solo uso), marca la sesión como autenticada (cookie `auth.session`) y fija la cookie HttpOnly `auth.refresh`.',
