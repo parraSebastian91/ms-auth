@@ -10,11 +10,7 @@ import { ContactoRepositoryAdapter } from './adapter/contactoRepository.adapter'
 import { RolRepositoryAdapter } from './adapter/rolRepository.adapter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContactoEntity } from './database/entities/contacto.entity';
-import { CuentaBancariaEntity } from './database/entities/cuentaBancaria.entity';
 import { ModuloEntity } from './database/entities/modulo.entity';
-import { OrganizacionEntity } from './database/entities/organizacion.entity';
-import { OrganizacionContactoEntity } from './database/entities/organizacionContacto.entity';
-import { OrganizacionSistemaEntity } from './database/entities/organizacionSistema.entity';
 import { PermisoEntity } from './database/entities/permisos.entity';
 import { RolEntity } from './database/entities/rol.entity';
 import { RolModuloPermisoEntity } from './database/entities/rolModuloPermiso.entity';
@@ -45,11 +41,7 @@ import { EMAIL_SERVICE } from '../core/domain/puertos/outbound/IEmailService.int
     ConfigModule,
     TypeOrmModule.forFeature([
       ContactoEntity,
-      CuentaBancariaEntity,
       ModuloEntity,
-      OrganizacionEntity,
-      OrganizacionContactoEntity,
-      OrganizacionSistemaEntity,
       PermisoEntity,
       RolEntity,
       RolModuloPermisoEntity,

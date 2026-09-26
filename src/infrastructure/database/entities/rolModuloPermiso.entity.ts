@@ -3,7 +3,7 @@ import { RolEntity } from "./rol.entity";
 import { PermisoEntity } from "./permisos.entity";
 import { ModuloEntity } from "./modulo.entity";
 
-@Entity({ name: 'rol_modulo_permiso' })
+@Entity({ name: 'rol_modulo_permiso', schema: 'identity' })
 export class RolModuloPermisoEntity {
 
     @PrimaryColumn({ name: 'rol_id' })

@@ -31,7 +31,7 @@ export class RolRepositoryAdapter implements IRolRepository {
     const usuarioEstandar = [3, 5];
     // const RolEjecutivoAdm = [3, 5, 8];
     let query = `
-        INSERT INTO core.usuario_rol (usuario_id, rol_id) VALUES `;
+        INSERT INTO identity.usuario_rol (usuario_id, rol_id) VALUES `;
     switch (tipoUsuario) {
       case rolEnum.CEDENTE:
         RolCedente.forEach((rolId) => {

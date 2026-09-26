@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, PrimaryColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, PrimaryColumn, ManyToOne, JoinColumn } from "typeorm";
 import { TipoContactoEntity } from "./tipoContacto.entity";
-import { OrganizacionEntity } from "./organizacion.entity";
 import { UsuarioEntity } from "./usuario.entity";
 
 /**
@@ -27,7 +26,7 @@ export interface AvatarData {
     uploadedBy?: string;         // UUID del usuario que subió la imagen (opcional)
 }
 
-@Entity({ name: 'contacto' })
+@Entity({ name: 'contacto', schema: 'identity' })
 export class ContactoEntity {
 
     @PrimaryGeneratedColumn({ name: 'contacto_id' })
@@ -85,24 +84,6 @@ export class ContactoEntity {
     @JoinColumn({ name: 'tipo_contacto_id' })
     tipoContacto: TipoContactoEntity;
 
-    @ManyToMany(() => OrganizacionEntity,
-        organizacion => organizacion.contactos,
-        {
-            onDelete: 'NO ACTION', onUpdate: 'NO ACTION'
-
-        })
-    @JoinTable({
-        name: 'organizacion_contacto',
-        joinColumn: {
-            name: 'contacto_id',
-            referencedColumnName: 'id',
-        },
-        inverseJoinColumn: {
-            name: 'organizacion_id',
-            referencedColumnName: 'id',
-        },
-    })
-    organizaciones: OrganizacionEntity[];
 
 
 }

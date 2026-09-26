@@ -2,7 +2,7 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from "t
 import { ModuloEntity } from "./modulo.entity";
 
 
-@Entity({ name: 'funcionalidad', schema: 'core' })
+@Entity({ name: 'funcionalidad', schema: 'identity' })
 export class FuncionalidadEntity {
 
     @PrimaryGeneratedColumn({ name: 'funcionalidad_id', type: 'bigint' })

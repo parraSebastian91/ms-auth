@@ -4,7 +4,7 @@ import { UsuarioEntity } from "./usuario.entity";
 import { ModuloEntity } from "./modulo.entity";
 
 
-@Entity({ name: 'rol' })
+@Entity({ name: 'rol', schema: 'identity' })
 export class RolEntity {
 
     @PrimaryGeneratedColumn({ name: 'rol_id' })
@@ -24,6 +24,7 @@ export class RolEntity {
         { onDelete: 'NO ACTION', onUpdate: 'NO ACTION' })
     @JoinTable({
         name: 'rol_modulo_permiso',
+        schema: 'identity',
         joinColumn: {
             name: 'rol_id',
             referencedColumnName: 'id',
@@ -41,6 +42,7 @@ export class RolEntity {
         { onDelete: 'NO ACTION', onUpdate: 'NO ACTION' })
     @JoinTable({
         name: 'rol_modulo_permiso',
+        schema: 'identity',
         joinColumn: {
             name: 'rol_id',
             referencedColumnName: 'id',
@@ -55,6 +57,7 @@ export class RolEntity {
     @ManyToMany(() => UsuarioEntity, usuario => usuario.rol)
     @JoinTable({
         name: 'usuario_rol',
+        schema: 'identity',
         joinColumn: {
             name: 'rol_id',
             referencedColumnName: 'id',

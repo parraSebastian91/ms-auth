@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDateColumn, Index, Generated } from 'typeorm';
 import { UsuarioEntity } from './usuario.entity';
 
-@Entity('password_reset_tokens')
+@Entity({ name: 'password_reset_tokens', schema: 'identity' })
 @Index('idx_password_reset_token_hash', ['tokenHash'])
 @Index('idx_password_reset_user_id', ['userId'])
 @Index('idx_password_reset_expires_at', ['expiresAt'])
