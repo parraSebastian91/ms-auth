@@ -19,9 +19,9 @@ fi
 vault_get() {
     local path=$1
     local field=$2
-    curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
+    curl -sf -H "X-Vault-Token: $VAULT_TOKEN" \
         "$VAULT_ADDR/v1/$path" | \
-        jq -r ".data.data.$field"
+        jq -r ".data.data.$field // empty"
 }
 
 load_database(){
@@ -84,7 +84,7 @@ load_storage_minio(){
 
 load_rabbit_env(){
     echo "  🔑 Cargando secrets de RabbitMQ..."
-    local path="secret/flowis/rabbitmq"
+    local path="secret/data/flowis/rabbitmq"
     export RABBITMQ_HOST=$(vault_get "$path" "RABBITMQ_HOST")
     export RABBITMQ_PORT=$(vault_get "$path" "RABBITMQ_PORT")
     export RABBITMQ_USER=$(vault_get "$path" "RABBITMQ_USER")
@@ -105,6 +105,7 @@ load_session_env
 export CORS_ORIGINS=$(vault_get "secret/data/flowis/seis-auth-service" "CORS_ORIGINS")
 export NODE_ENV=$(vault_get "secret/data/flowis/seis-auth-service" "NODE_ENV")
 export PORT=$(vault_get "secret/data/flowis/seis-auth-service" "PORT")
+export PORT="${PORT:-3000}"
 export MIN_LOG_LEVEL=$(vault_get "secret/data/flowis/seis-auth-service" "MIN_LOG_LEVEL")
 
 echo "🚀 Iniciando aplicación..."

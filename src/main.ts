@@ -85,8 +85,9 @@ async function bootstrap() {
   //   next();
   // });
 
-  await app.listen(process.env.PORT).then(() => {
-    console.log(`Application is running on: ${process.env.PORT}`);
+  const port = Number.parseInt(process.env.PORT ?? '', 10) || 3000;
+  await app.listen(port, '0.0.0.0').then(() => {
+    console.log(`Application is running on: ${port}`);
   });
 }
 bootstrap();
