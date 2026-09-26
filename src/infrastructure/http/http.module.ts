@@ -13,6 +13,9 @@ import { AuthGuard } from './guards/auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import { LoggerInterceptor } from './middleware/logger.interceptor';
 import { RegistroController } from './controllers/registro.controller';
+import { UserProfileController } from './controllers/userProfile.controller';
+import { JwtAccessGuard } from './guards/jwt-access.guard';
+import { PermissionsGuard } from './guards/permissions.guard';
 
 @Module({
   imports: [
@@ -30,14 +33,15 @@ import { RegistroController } from './controllers/registro.controller';
       maxRedirects: 5,
     }),
   ],
-  controllers: [AuthController, RegistroController, HealthController],
+  controllers: [AuthController, RegistroController, HealthController, UserProfileController],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggerInterceptor,
     },
     AuthGuard,
-    // PermissionsGuard,
+    JwtAccessGuard,
+    PermissionsGuard,
     // Aplicar AuthGuard globalmente
     {
       provide: APP_GUARD,

@@ -17,6 +17,9 @@ import { CacheRepositoryAdapter } from 'src/infrastructure/adapter/cacheReposito
 import { ICacheRepository } from './domain/puertos/outbound/CacheRepository.interface';
 import { IEmailService, EMAIL_SERVICE } from './domain/puertos/outbound/IEmailService.interface';
 import { RegistroUseCaseImpl } from './aplication/useCase/registro/registro.usecase.impl';
+import { IUserProfileRepository } from './domain/puertos/outbound/IUserProfileRepository.interface';
+import { USER_PROFILE_USE_CASE } from './domain/puertos/inbound/IUserProfile.usecase.interface';
+import { UserProfileUseCase } from './aplication/useCase/userProfile/userProfile.usecase';
 
 export type CoreModuleOptions = {
     modules: any[];
@@ -27,6 +30,7 @@ export type CoreModuleOptions = {
         refreshSessionRepository: Type<IRefreshSessionRepository>;
         passwordResetRepository: Type<IPasswordResetRepository>;
         cacheRepository: Type<ICacheRepository>;
+        userProfileRepository: Type<IUserProfileRepository>;
     }
 }
 
@@ -53,6 +57,7 @@ export class CoreModule {
             passwordResetRepository,
             cacheRepository,
             rolRepository,
+            userProfileRepository,
         } = adapters;
 
         // Auth Service Provider
@@ -98,6 +103,14 @@ export class CoreModule {
                     emailService,
                     rolRepository,
                 );
+            },
+        };
+
+        const userProfileUseCaseProvider = {
+            provide: USER_PROFILE_USE_CASE,
+            inject: [userProfileRepository],
+            useFactory(repository: IUserProfileRepository) {
+                return new UserProfileUseCase(repository);
             },
         };
 
@@ -149,10 +162,12 @@ export class CoreModule {
                 authAplicationServiceProvider,
                 authUseCaseProvider,
                 registroUseCaseProvider,
+                userProfileUseCaseProvider,
             ],
             exports: [
                 REGISTRO_USE_CASE,
                 AUTH_USE_CASE,
+                USER_PROFILE_USE_CASE,
             ],
         };
     }
